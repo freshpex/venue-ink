@@ -142,9 +142,32 @@ export function adminRoutes(app, { pool }) {
         'UPDATE venue_app.users SET role=$1,active=$2,session_version=session_version+1,updated_at=now() WHERE id=$3',
         [v.role || user.role, v.active ?? user.active, userId],
       );
-      const nextRole=v.role||user.role;
-      if(['artist','studio','admin'].includes(nextRole)&&!(await db.query('SELECT 1 FROM venue_app.artist_profiles WHERE user_id=$1',[userId])).rowCount){const studioId=randomUUID();const slug='artist-'+userId.slice(0,12);await db.query('INSERT INTO venue_app.studios(id,owner_id,name,slug) VALUES($1,$2,$3,$4)',[studioId,userId,user.name+' Studio',slug]);await db.query('INSERT INTO venue_app.artist_profiles(user_id,studio_id,slug,display_name) VALUES($1,$2,$3,$4)',[userId,studioId,slug,user.name]);}
-      if(nextRole==='client'||v.active===false){await db.query('UPDATE venue_app.artist_profiles SET published=false,books_open=false WHERE user_id=$1',[userId]);await db.query('UPDATE venue_app.studios SET published=false WHERE owner_id=$1',[userId]);}
+      const nextRole = v.role || user.role;
+      if (
+        ['artist', 'studio', 'admin'].includes(nextRole) &&
+        !(await db.query('SELECT 1 FROM venue_app.artist_profiles WHERE user_id=$1', [userId]))
+          .rowCount
+      ) {
+        const studioId = randomUUID();
+        const slug = 'artist-' + userId.slice(0, 12);
+        await db.query('INSERT INTO venue_app.studios(id,owner_id,name,slug) VALUES($1,$2,$3,$4)', [
+          studioId,
+          userId,
+          user.name + ' Studio',
+          slug,
+        ]);
+        await db.query(
+          'INSERT INTO venue_app.artist_profiles(user_id,studio_id,slug,display_name) VALUES($1,$2,$3,$4)',
+          [userId, studioId, slug, user.name],
+        );
+      }
+      if (nextRole === 'client' || v.active === false) {
+        await db.query(
+          'UPDATE venue_app.artist_profiles SET published=false,books_open=false WHERE user_id=$1',
+          [userId],
+        );
+        await db.query('UPDATE venue_app.studios SET published=false WHERE owner_id=$1', [userId]);
+      }
       await audit(db, req.user, 'account.updated', userId, v);
     });
     res.json({ ok: true });

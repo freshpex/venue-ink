@@ -1,4 +1,14 @@
-.hero-pen-mark{display:inline-flex;vertical-align:middle;margin-left:15px;transform:rotate(-20deg)}.hero-pen-mark svg{width:.65em;height:.65em;stroke-width:1.4}
+.hero-pen-mark {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 15px;
+  transform: rotate(-20deg);
+}
+.hero-pen-mark svg {
+  width: 0.65em;
+  height: 0.65em;
+  stroke-width: 1.4;
+}
 .logo-arrow {
   display: inline-flex;
   margin-left: 3px;

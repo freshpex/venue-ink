@@ -123,7 +123,7 @@ export function publicRoutes(app, { pool, writeLimiter }) {
     res.json({
       events: (
         await pool.query(
-          "SELECT e.id,e.title,e.description,e.location,e.starts_at,e.ends_at,e.capacity,e.artist_id,e.service_id,e.studio_id,a.display_name AS artist_name,st.name AS studio_name,st.timezone,(SELECT count(*)::integer FROM venue_app.bookings b WHERE b.event_id=e.id AND b.status IN ('confirmed','completed')) AS reserved FROM venue_app.events e JOIN venue_app.artist_profiles a ON a.user_id=e.artist_id JOIN venue_app.studios st ON st.id=e.studio_id WHERE e.published=true AND e.ends_at>now() ORDER BY e.starts_at LIMIT 100",
+          "SELECT e.id,e.title,e.description,e.location,e.starts_at,e.ends_at,e.capacity,e.artist_id,e.service_id,e.studio_id,a.display_name AS artist_name,st.name AS studio_name,st.timezone,(SELECT count(*)::integer FROM venue_app.bookings b WHERE b.event_id=e.id AND b.status IN ('confirmed','completed')) AS reserved FROM venue_app.events e JOIN venue_app.artist_profiles a ON a.user_id=e.artist_id JOIN venue_app.studios st ON st.id=e.studio_id WHERE e.published=true AND a.published=true AND a.books_open=true AND st.published=true AND EXISTS(SELECT 1 FROM venue_app.users u WHERE u.id=a.user_id AND u.active=true) AND EXISTS(SELECT 1 FROM venue_app.services s WHERE s.id=e.service_id AND s.active=true) AND e.ends_at>now() ORDER BY e.starts_at LIMIT 100",
         )
       ).rows,
     }),
@@ -153,7 +153,7 @@ export function publicRoutes(app, { pool, writeLimiter }) {
     const bytes = (await pool.query('SELECT data FROM venue_app.assets WHERE id=$1', [assetId]))
       .rows[0].data;
     res.set('Content-Type', asset.mime_type);
-    if(asset.public)res.set('Cross-Origin-Resource-Policy','cross-origin');
+    if (asset.public) res.set('Cross-Origin-Resource-Policy', 'cross-origin');
     res.set('Cache-Control', asset.public ? 'public,max-age=3600' : 'private,no-store');
     res.set('X-Content-Type-Options', 'nosniff');
     res.send(bytes);
@@ -195,3 +195,4 @@ export function publicRoutes(app, { pool, writeLimiter }) {
     res.status(201).json({ request: record });
   });
 }
+

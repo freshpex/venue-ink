@@ -1,7 +1,7 @@
 import express from 'express';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { resolve,sep } from 'node:path';
+import { resolve, sep } from 'node:path';
 import { createPool, migrateDatabase } from './db.mjs';
 import { seedDatabase } from './seed.mjs';
 import { createApp } from './app.mjs';
@@ -46,8 +46,17 @@ const pool = createPool();
 const app = createApp({ pool, secret: process.env.JWT_SECRET, origins, production });
 const publicDirectory = fileURLToPath(new URL('../public', import.meta.url));
 const dist = fileURLToPath(new URL('../dist', import.meta.url));
-if (production && existsSync(`${dist}/index.html`)) {
-  app.get(/^(?!\/api(?:\/|$)).*/, (req,res,next)=>{if(/^\/(admin|dashboard|bookings|workspace|login|register)(\/|$)/.test(req.path)){res.set('Cache-Control','no-store');res.set('X-Robots-Tag','noindex,nofollow');return next();}const path=resolve(dist,'.'+decodeURIComponent(req.path),'index.html');if(path.startsWith(resolve(dist)+sep)&&existsSync(path))return res.sendFile(path);next();});
+if ((production || process.env.SERVE_DIST === 'true') && existsSync(`${dist}/index.html`)) {
+  app.get(/^(?!\/api(?:\/|$)).*/, (req, res, next) => {
+    if (/^\/(admin|dashboard|bookings|workspace|login|register)(\/|$)/.test(req.path)) {
+      res.set('Cache-Control', 'no-store');
+      res.set('X-Robots-Tag', 'noindex,nofollow');
+      return next();
+    }
+    const path = resolve(dist, '.' + decodeURIComponent(req.path), 'index.html');
+    if (path.startsWith(resolve(dist) + sep) && existsSync(path)) return res.sendFile(path);
+    next();
+  });
   app.use(express.static(dist, { index: false, maxAge: '1h' }));
   app.get(/^(?!\/api(?:\/|$)).*/, (_req, res) => res.sendFile(`${dist}/index.html`));
 } else app.use('/images', express.static(`${publicDirectory}/images`, { maxAge: '1h' }));

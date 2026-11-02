@@ -13,7 +13,7 @@ export function bookingScope(user, start = 1) {
   };
 }
 export async function getBooking(db, bookingId, user, { lock = false, manage = false } = {}) {
-  if(lock)await db.query('SELECT id FROM venue_app.bookings WHERE id=$1 FOR UPDATE',[bookingId]);
+  if (lock) await db.query('SELECT id FROM venue_app.bookings WHERE id=$1 FOR UPDATE', [bookingId]);
   const result = await db.query(
     `SELECT ${bookingFields},st.owner_id AS studio_owner ${bookingJoins} WHERE b.id=$1`,
     [bookingId],
@@ -23,8 +23,8 @@ export async function getBooking(db, bookingId, user, { lock = false, manage = f
     !row ||
     !(
       user.role === 'admin' ||
-      (isStaff(user)&&row.artist_id === user.id) ||
-      (isStaff(user)&&row.studio_owner === user.id) ||
+      (isStaff(user) && row.artist_id === user.id) ||
+      (isStaff(user) && row.studio_owner === user.id) ||
       (!manage && row.client_id === user.id)
     )
   )
@@ -55,7 +55,12 @@ export async function audit(db, user, action, entityId, details = {}) {
   );
 }
 export async function getSlots(db, { artistId, serviceId, date, eventId }) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date)) || new Date(date).toISOString().slice(0,10)!==date || +new Date(date)>Date.now()+366*86400000)
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+    Number.isNaN(Date.parse(date)) ||
+    new Date(date).toISOString().slice(0, 10) !== date ||
+    +new Date(date) > Date.now() + 366 * 86400000
+  )
     throw new HttpError(400, 'Choose a valid date.');
   const profile = (
     await db.query(

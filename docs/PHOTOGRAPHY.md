@@ -40,4 +40,3 @@ No official Venue photography was copied into this implementation. Brand screens
 ## Replacement guidance
 
 Replace these illustrative photos with written-permission Venue member photography before presenting specific artist profiles, flash inventory, customer stories, or studio affiliations as factual. Keep the manifest synchronized when assets are replaced. Provide responsive dimensions and alt text from the manifest; use eager loading only for a page's main hero and lazy loading for images below the fold.
-

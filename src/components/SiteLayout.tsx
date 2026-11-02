@@ -5,13 +5,13 @@ import { ArrowUpRight, ChevronDown, Menu, X, UserRound, PenTool } from 'lucide-r
 import { AnimatePresence, motion, useScroll, useReducedMotion } from 'motion/react';
 import { Button } from './ui/button';
 import { navFeatures } from '../data/site';
-import { useSession,useApi } from '../lib/queries';
+import { useSession, useApi } from '../lib/queries';
 import { TouchFeedback, MobileBookingAction } from './MotionSystem';
 export function Logo() {
-  const site=useApi<{settings:{brand_name:string}}>('/site');
+  const site = useApi<{ settings: { brand_name: string } }>('/site');
   return (
     <span className="wordmark">
-      {site.data?.settings.brand_name.toLowerCase()||'venue'}
+      {site.data?.settings.brand_name.toLowerCase() || 'venue'}
       <span className="logo-arrow">
         <ArrowUpRight size={26} />
       </span>

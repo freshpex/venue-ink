@@ -306,32 +306,36 @@ export function workspaceRoutes(app, { pool }) {
       (v.mimeType === 'image/webp' && webp)
     ))
       throw new HttpError(400, 'Choose a valid JPEG, PNG or WebP image.');
-    const usage = Number(
-      (
-        await pool.query(
-          'SELECT COALESCE(sum(byte_size),0) AS bytes FROM venue_app.assets WHERE owner_id=$1',
-          [req.user.id],
-        )
-      ).rows[0].bytes,
-    );
-    if (usage + bytes.length > 40 * 1024 * 1024)
-      throw new HttpError(
-        409,
-        'Your image storage is full. Remove unused images before uploading more.',
+    const asset = await transaction(pool, async (db) => {
+      await db.query('SELECT id FROM venue_app.users WHERE id=$1 FOR UPDATE', [req.user.id]);
+      const usage = Number(
+        (
+          await db.query(
+            'SELECT COALESCE(sum(byte_size),0) AS bytes FROM venue_app.assets WHERE owner_id=$1',
+            [req.user.id],
+          )
+        ).rows[0].bytes,
       );
-    const asset = (
-      await pool.query(
-        'INSERT INTO venue_app.assets(id,owner_id,mime_type,filename,byte_size,data) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,filename,byte_size',
-        [
-          randomUUID(),
-          req.user.id,
-          v.mimeType,
-          v.filename.replace(/[^a-zA-Z0-9._ -]/g, '').slice(0, 150) || 'reference',
-          bytes.length,
-          bytes,
-        ],
-      )
-    ).rows[0];
+      if (usage + bytes.length > 40 * 1024 * 1024)
+        throw new HttpError(
+          409,
+          'Your image storage is full. Remove unused images before uploading more.',
+        );
+      const saved = (
+        await db.query(
+          'INSERT INTO venue_app.assets(id,owner_id,mime_type,filename,byte_size,data) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,filename,byte_size',
+          [
+            randomUUID(),
+            req.user.id,
+            v.mimeType,
+            v.filename.replace(/[^a-zA-Z0-9._ -]/g, '').slice(0, 150) || 'reference',
+            bytes.length,
+            bytes,
+          ],
+        )
+      ).rows[0];
+      return saved;
+    });
     res.status(201).json({ asset: { ...asset, url: `/api/assets/${asset.id}` } });
   });
   app.get('/api/assets', async (req, res) =>

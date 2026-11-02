@@ -155,7 +155,9 @@ export function createApp({ pool, secret, origins, production = false, limit = 2
           let studioId = invitation?.studio_id;
           if (!studioId) {
             studioId = randomUUID();
-            const zone=(await db.query("SELECT timezone FROM venue_app.settings WHERE id='site'")).rows[0]?.timezone||'UTC';
+            const zone =
+              (await db.query("SELECT timezone FROM venue_app.settings WHERE id='site'")).rows[0]
+                ?.timezone || 'UTC';
             await db.query(
               'INSERT INTO venue_app.studios(id,owner_id,name,slug,timezone) VALUES($1,$2,$3,$4,$5)',
               [

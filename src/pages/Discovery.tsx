@@ -201,7 +201,7 @@ export function StudioProfile() {
 }
 export function BookingPage() {
   const [open, setOpen] = useState(false);
-  const [params]=useSearchParams();
+  const [params] = useSearchParams();
   return (
     <>
       <PageIntro
@@ -238,7 +238,11 @@ export function BookingPage() {
           </Button>
         </Reveal>
       </section>
-      <BookingWizard open={open} onOpenChange={setOpen} serviceId={params.get('service')||undefined} />
+      <BookingWizard
+        open={open}
+        onOpenChange={setOpen}
+        serviceId={params.get('service') || undefined}
+      />
     </>
   );
 }

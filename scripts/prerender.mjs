@@ -1,7 +1,129 @@
-import { readFileSync,writeFileSync,mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { editorial } from '../server/content.mjs';
-const routes={'/':'More ink. Less admin.','/for-tattoo-artists':'Make your own mark.','/studios':'Good people. Great work. One studio.','/features':'A little less everything else.','/booking':'Booking, on your terms.','/artists':'Find your creative fit.','/flash':'Made to be inked.','/artist-websites':'Your link. Your world.','/payments':'A smooth finish to great work.','/pricing':'Good art. Clear pricing.','/info/mobile-app':'Made to move with you.','/services':'Room for your kind of craft.','/about':'Space for the work. Room for you.','/events':'Make a day of it.','/journal':'Notes from the studio.','/help':'A little clarity.','/contact':'Good things start with a hello.','/get-started':'A Venue for your next chapter.','/credits':'Real work. Real credit.','/terms':'Using your Venue.','/privacy':'Your information. Your trust.','/booking-terms':'Before your appointment.'};
-for(const article of editorial)routes['/journal/'+article.slug]=article.title;
-const html=readFileSync('dist/index.html','utf8');const base=(process.env.SITE_URL||process.env.RENDER_EXTERNAL_URL||'http://localhost:3001').replace(/\/$/,'');const escape=value=>value.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
-for(const [route,title]of Object.entries(routes)){const article=editorial.find(a=>route==='/journal/'+a.slug);const description=article?.excerpt||title+' Artist pages, booking requests, original artwork and studio management with Venue.';const data=JSON.stringify({'@context':'https://schema.org','@type':article?'Article':'WebPage',name:title,description,url:base+route,...(article?{headline:title,author:{'@type':'Organization',name:'Venue Editorial'}}:{})}).replaceAll('<','\\u003c');const meta='<link rel="canonical" href="'+base+route+'"/><meta property="og:title" content="'+escape(title)+' | Venue"/><meta property="og:description" content="'+escape(description)+'"/><meta property="og:type" content="'+(article?'article':'website')+'"/><meta property="og:url" content="'+base+route+'"/><meta property="og:image" content="'+base+'/images/hero-tattoo-session.webp"/><meta name="twitter:card" content="summary_large_image"/><script type="application/ld+json">'+data+'</script>';const fallback='<div id="root"><main style="font-family:sans-serif;max-width:900px;margin:80px auto;padding:30px"><h1>'+escape(title)+'</h1><p>'+escape(description)+'</p>'+(article?article.body.split('\n\n').map(p=>p.startsWith('## ')?'<h2>'+escape(p.slice(3))+'</h2>':'<p>'+escape(p)+'</p>').join(''):'<p>Find an artist, share your idea and request an available time. Keep the booking conversation and payment arrangements in your account.</p>')+'<nav>'+Object.entries(routes).slice(0,22).map(([url,label])=>'<a href="'+url+'" style="display:inline-block;margin:10px">'+escape(label)+'</a>').join('')+'</nav></main></div>';const output=html.replace(/<title>.*?<\/title>/,'<title>'+escape(title)+' | Venue</title>').replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/?>/,'<meta name="description" content="'+escape(description)+'"/>').replace('</head>',meta+'</head>').replace('<div id="root"></div>',fallback);if(route==='/')writeFileSync('dist/index.html',output);else{mkdirSync('dist'+route,{recursive:true});writeFileSync('dist'+route+'/index.html',output);}}
-writeFileSync('dist/robots.txt','User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /dashboard\nDisallow: /api\nDisallow: /bookings\nSitemap: '+base+'/sitemap.xml\n');writeFileSync('dist/sitemap.xml','<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+Object.keys(routes).map(r=>'<url><loc>'+base+r+'</loc></url>').join('')+'</urlset>');writeFileSync('dist/_redirects','/* /index.html 200\n');console.log('Generated public metadata and readable HTML for '+Object.keys(routes).length+' routes.');
+const routes = {
+  '/': 'More ink. Less admin.',
+  '/for-tattoo-artists': 'Make your own mark.',
+  '/studios': 'Good people. Great work. One studio.',
+  '/features': 'A little less everything else.',
+  '/booking': 'Booking, on your terms.',
+  '/artists': 'Find your creative fit.',
+  '/flash': 'Made to be inked.',
+  '/artist-websites': 'Your link. Your world.',
+  '/payments': 'A smooth finish to great work.',
+  '/pricing': 'Good art. Clear pricing.',
+  '/info/mobile-app': 'Made to move with you.',
+  '/services': 'Room for your kind of craft.',
+  '/about': 'Space for the work. Room for you.',
+  '/events': 'Make a day of it.',
+  '/journal': 'Notes from the studio.',
+  '/help': 'A little clarity.',
+  '/contact': 'Good things start with a hello.',
+  '/get-started': 'A Venue for your next chapter.',
+  '/credits': 'Real work. Real credit.',
+  '/terms': 'Using your Venue.',
+  '/privacy': 'Your information. Your trust.',
+  '/booking-terms': 'Before your appointment.',
+};
+for (const article of editorial) routes['/journal/' + article.slug] = article.title;
+const html = readFileSync('dist/index.html', 'utf8');
+const base = (
+  process.env.SITE_URL ||
+  process.env.RENDER_EXTERNAL_URL ||
+  'http://localhost:3001'
+).replace(/\/$/, '');
+const escape = (value) =>
+  value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');
+for (const [route, title] of Object.entries(routes)) {
+  const article = editorial.find((a) => route === '/journal/' + a.slug);
+  const description =
+    article?.excerpt ||
+    title + ' Artist pages, booking requests, original artwork and studio management with Venue.';
+  const data = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': article ? 'Article' : 'WebPage',
+    name: title,
+    description,
+    url: base + route,
+    ...(article
+      ? { headline: title, author: { '@type': 'Organization', name: 'Venue Editorial' } }
+      : {}),
+  }).replaceAll('<', '\\u003c');
+  const meta =
+    '<link rel="canonical" href="' +
+    base +
+    route +
+    '"/><meta property="og:title" content="' +
+    escape(title) +
+    ' | Venue"/><meta property="og:description" content="' +
+    escape(description) +
+    '"/><meta property="og:type" content="' +
+    (article ? 'article' : 'website') +
+    '"/><meta property="og:url" content="' +
+    base +
+    route +
+    '"/><meta property="og:image" content="' +
+    base +
+    '/images/hero-tattoo-session.webp"/><meta name="twitter:card" content="summary_large_image"/><script type="application/ld+json">' +
+    data +
+    '</script>';
+  const fallback =
+    '<div id="root"><main style="font-family:sans-serif;max-width:900px;margin:80px auto;padding:30px"><h1>' +
+    escape(title) +
+    '</h1><p>' +
+    escape(description) +
+    '</p>' +
+    (article
+      ? article.body
+          .split('\n\n')
+          .map((p) =>
+            p.startsWith('## ')
+              ? '<h2>' + escape(p.slice(3)) + '</h2>'
+              : '<p>' + escape(p) + '</p>',
+          )
+          .join('')
+      : '<p>Find an artist, share your idea and request an available time. Keep the booking conversation and payment arrangements in your account.</p>') +
+    '<nav>' +
+    Object.entries(routes)
+      .slice(0, 22)
+      .map(
+        ([url, label]) =>
+          '<a href="' +
+          url +
+          '" style="display:inline-block;margin:10px">' +
+          escape(label) +
+          '</a>',
+      )
+      .join('') +
+    '</nav></main></div>';
+  const output = html
+    .replace(/<title>.*?<\/title>/, '<title>' + escape(title) + ' | Venue</title>')
+    .replace(
+      /<meta\s+name="description"\s+content="[^"]*"\s*\/?>/,
+      '<meta name="description" content="' + escape(description) + '"/>',
+    )
+    .replace('</head>', meta + '</head>')
+    .replace('<div id="root"></div>', fallback);
+  if (route === '/') writeFileSync('dist/index.html', output);
+  else {
+    mkdirSync('dist' + route, { recursive: true });
+    writeFileSync('dist' + route + '/index.html', output);
+  }
+}
+writeFileSync(
+  'dist/robots.txt',
+  'User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /dashboard\nDisallow: /api\nDisallow: /bookings\nSitemap: ' +
+    base +
+    '/sitemap.xml\n',
+);
+writeFileSync(
+  'dist/sitemap.xml',
+  '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
+    Object.keys(routes)
+      .map((r) => '<url><loc>' + base + r + '</loc></url>')
+      .join('') +
+    '</urlset>',
+);
+writeFileSync('dist/_redirects', '/* /index.html 200\n');
+console.log(
+  'Generated public metadata and readable HTML for ' + Object.keys(routes).length + ' routes.',
+);

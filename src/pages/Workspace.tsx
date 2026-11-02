@@ -44,8 +44,18 @@ export function WorkspaceLogin() {
   });
   useEffect(() => () => controller.current?.abort(), []);
   useEffect(() => {
-    if (session.data){const next=params.get('next');navigate(next&&next.startsWith('/')&&!next.startsWith('//')?next:session.data.role === 'admin' ? '/admin' : '/dashboard', { replace: true });}
-  }, [session.data, navigate,params]);
+    if (session.data) {
+      const next = params.get('next');
+      navigate(
+        next && next.startsWith('/') && !next.startsWith('//')
+          ? next
+          : session.data.role === 'admin'
+            ? '/admin'
+            : '/dashboard',
+        { replace: true },
+      );
+    }
+  }, [session.data, navigate, params]);
   return (
     <section className="auth-page">
       <div className="auth-photo">

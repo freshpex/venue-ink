@@ -63,7 +63,14 @@ function Metadata() {
     document.title = `${info.title} | Venue Ink`;
     const desc = document.querySelector('meta[name="description"]');
     desc?.setAttribute('content', info.description);
-    document.querySelector('meta[name="robots"]')?.setAttribute('content',/^\/(admin|dashboard|bookings|workspace|login|register)(\/|$)/.test(pathname)?'noindex,nofollow':'index,follow');
+    document
+      .querySelector('meta[name="robots"]')
+      ?.setAttribute(
+        'content',
+        /^\/(admin|dashboard|bookings|workspace|login|register)(\/|$)/.test(pathname)
+          ? 'noindex,nofollow'
+          : 'index,follow',
+      );
     let canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
     if (!canonical) {
       canonical = document.createElement('link');

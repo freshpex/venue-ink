@@ -399,9 +399,15 @@ export default function Home() {
                   <span>Bookings. Conversations. Headspace.</span>
                 </Link>
                 <nav>
-                  <Link to="/dashboard?tab=calendar" aria-label="Open calendar"><CalendarDays /></Link>
-                  <Link to="/dashboard?tab=bookings" aria-label="Open booking conversations"><MessageSquare /></Link>
-                  <Link to="/flash" aria-label="Explore artwork"><Palette /></Link>
+                  <Link to="/dashboard?tab=calendar" aria-label="Open calendar">
+                    <CalendarDays />
+                  </Link>
+                  <Link to="/dashboard?tab=bookings" aria-label="Open booking conversations">
+                    <MessageSquare />
+                  </Link>
+                  <Link to="/flash" aria-label="Explore artwork">
+                    <Palette />
+                  </Link>
                 </nav>
               </div>
             </div>

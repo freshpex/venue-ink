@@ -51,13 +51,14 @@ export function BookingWizard({
   const artistsQuery = useApi<{ artists: Artist[] }>('/artists', { enabled: open });
   const servicesQuery = useApi<{ services: Service[] }>('/services', { enabled: open });
   const session = useSession();
-  const site=useApi<{settings:{booking_notice:string}}>('/site',{enabled:open});
+  const site = useApi<{ settings: { booking_notice: string } }>('/site', { enabled: open });
   const client = useQueryClient();
   const refresh = useRefresh();
   const [step, setStep] = useState(0);
   const [artistChoice, setArtistChoice] = useState('');
   const [serviceChoice, setServiceChoice] = useState('');
   const [day, setDay] = useState(() => new Date(Date.now() + 86400000).toLocaleDateString('en-CA'));
+  const [dateBounds]=useState(()=>({min:new Date().toLocaleDateString('en-CA'),max:new Date(Date.now()+365*86400000).toLocaleDateString('en-CA')}));
   const [time, setTime] = useState('');
   const [files, setFiles] = useState<{ file: File; url: string }[]>([]);
   const urls = useRef<string[]>([]);
@@ -511,8 +512,8 @@ export function BookingWizard({
                           <input
                             type="date"
                             value={day}
-                            min={new Date().toLocaleDateString('en-CA')}
-                            max={new Date(Date.now() + 365 * 86400000).toLocaleDateString('en-CA')}
+                            min={dateBounds.min}
+                            max={dateBounds.max}
                             onChange={(event) => {
                               setDay(event.target.value);
                               setTime('');
@@ -649,7 +650,9 @@ export function BookingWizard({
                           ))}
                         </dl>
                         <p className="fine-print">
-                          {site.data?.settings.booking_notice||'Your artist reviews the request before confirming the appointment.'} Custom work is quoted after review.
+                          {site.data?.settings.booking_notice ||
+                            'Your artist reviews the request before confirming the appointment.'}{' '}
+                          Custom work is quoted after review.
                         </p>
                         <label className="checkbox-label">
                           <input type="checkbox" {...register('consent')} />

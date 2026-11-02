@@ -216,7 +216,9 @@ export function bookingRoutes(app, { pool }) {
       if (quote !== null && (deposit > quote || booking.paid_cents > quote))
         throw new HttpError(400, 'The quote cannot be less than the deposit or payments received.');
       const start = values.startsAt || new Date(booking.starts_at).toISOString();
-      const end = values.startsAt ? new Date(+new Date(start) + booking.duration_minutes * 60000).toISOString() : new Date(booking.ends_at).toISOString();
+      const end = values.startsAt
+        ? new Date(+new Date(start) + booking.duration_minutes * 60000).toISOString()
+        : new Date(booking.ends_at).toISOString();
       if (status === 'confirmed' && +new Date(start) <= Date.now())
         throw new HttpError(400, 'Choose a future time for this appointment.');
       if (['confirmed', 'completed'].includes(status)) {
@@ -246,11 +248,16 @@ export function bookingRoutes(app, { pool }) {
         }
         if (booking.event_id) {
           const event = (
-            await db.query('SELECT capacity,starts_at,ends_at FROM venue_app.events WHERE id=$1 FOR UPDATE', [
-              booking.event_id,
-            ])
+            await db.query(
+              'SELECT capacity,starts_at,ends_at FROM venue_app.events WHERE id=$1 FOR UPDATE',
+              [booking.event_id],
+            )
           ).rows[0];
-          if(+new Date(start)<+new Date(event.starts_at)||+new Date(end)>+new Date(event.ends_at))throw new HttpError(400,'Choose a time within the event.');
+          if (
+            +new Date(start) < +new Date(event.starts_at) ||
+            +new Date(end) > +new Date(event.ends_at)
+          )
+            throw new HttpError(400, 'Choose a time within the event.');
           const count = Number(
             (
               await db.query(
@@ -347,10 +354,16 @@ export function bookingRoutes(app, { pool }) {
           [req.user.id, values.idempotencyKey],
         )
       ).rows[0];
-      if (existing && (existing.booking_id !== booking.id || existing.method !== values.method || existing.purpose!==values.purpose || existing.status!=='requested'))
+      if (
+        existing &&
+        (existing.booking_id !== booking.id ||
+          existing.method !== values.method ||
+          existing.purpose !== values.purpose ||
+          existing.status !== 'requested')
+      )
         throw new HttpError(409, 'Please refresh this payment request and try again.');
       let paymentId = existing?.id;
-      if(existing)amount=existing.amount_cents;
+      if (existing) amount = existing.amount_cents;
       if (!paymentId) {
         await db.query(
           "UPDATE venue_app.payment_requests SET status='cancelled' WHERE booking_id=$1 AND user_id=$2 AND status='requested'",
@@ -427,17 +440,19 @@ export function bookingRoutes(app, { pool }) {
     );
     await transaction(pool, async (db) => {
       const metadata = (
-        await db.query(
-          'SELECT booking_id FROM venue_app.payment_requests WHERE id=$1',
-          [paymentId],
-        )
+        await db.query('SELECT booking_id FROM venue_app.payment_requests WHERE id=$1', [paymentId])
       ).rows[0];
       if (!metadata) throw new HttpError(404, 'Payment request not found.');
       const booking = await getBooking(db, metadata.booking_id, req.user, {
         lock: true,
         manage: true,
       });
-      const payment=(await db.query('SELECT id,booking_id,status,amount_cents FROM venue_app.payment_requests WHERE id=$1 FOR UPDATE',[paymentId])).rows[0];
+      const payment = (
+        await db.query(
+          'SELECT id,booking_id,status,amount_cents FROM venue_app.payment_requests WHERE id=$1 FOR UPDATE',
+          [paymentId],
+        )
+      ).rows[0];
       if (payment.status !== 'requested')
         throw new HttpError(409, 'This payment request has already been processed.');
       const amount = values.amountCents ?? payment.amount_cents;
