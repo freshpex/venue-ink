@@ -1,5 +1,3 @@
-# Deploy from this directory as the repository root.
-# If retaining the parent folder as repo root, set rootDir: venue-ink on both services.
 services:
   - type: web
     name: venue-preview-api
@@ -20,7 +18,7 @@ services:
       - key: CLIENT_ORIGINS
         sync: false
   - type: web
-    name: venue-preview-web
+    name: venue-ink
     runtime: static
     buildCommand: npm ci && npm run build
     staticPublishPath: dist

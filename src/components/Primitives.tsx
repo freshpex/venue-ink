@@ -56,8 +56,8 @@ export function Reveal({
       className={className}
       initial={reduced ? false : { opacity: 0, y: 45, clipPath: 'inset(6% 0 0 0)' }}
       whileInView={{ opacity: 1, y: 0, clipPath: 'inset(0% 0 0 0)' }}
-      viewport={{ once: true, amount: 0.12 }}
-      transition={{ duration: 0.7, delay, ease: [0.22, 1, 0.36, 1] }}
+      viewport={{ once: false, amount: 0.12 }}
+      transition={{ duration: 0.85, delay, ease: [0.22, 1, 0.36, 1] }}
     >
       {children}
     </motion.div>
@@ -66,7 +66,7 @@ export function Reveal({
 export function Label({ children, light = false }: { children: ReactNode; light?: boolean }) {
   return (
     <span className={`eyebrow ${light ? 'eyebrow-light' : ''}`}>
-      <span className="little-cross">✳</span>
+      <span className="label-rule" aria-hidden="true" />
       {children}
     </span>
   );
@@ -96,9 +96,7 @@ export function CTA({
 }) {
   return (
     <section className="closing-cta">
-      <div className="orbit-mark" aria-hidden="true">
-        ✳
-      </div>
+      <div className="ink-orbit" aria-hidden="true" />
       <Reveal>
         <Label>GOOD ART STARTS WITH A LITTLE SPACE</Label>
         <h2>{title}</h2>
@@ -141,12 +139,5 @@ export function PageIntro({ label, title, text }: { label: string; title: string
         <p>{text}</p>
       </Reveal>
     </section>
-  );
-}
-export function DemoBadge() {
-  return (
-    <span className="demo-badge">
-      <i /> Interactive example
-    </span>
   );
 }

@@ -10,17 +10,22 @@ import {
   CreditCard,
   Link2,
   Check,
-  Play,
+  PenTool,
   Palette,
 } from 'lucide-react';
 import useEmblaCarousel from 'embla-carousel-react';
 import { Button } from '../components/ui/button';
 import { Photo, Reveal, Label, ArrowLink, CTA, FAQs } from '../components/Primitives';
-import { StudioDemo } from '../features/demo/StudioDemo';
-import { BookingWizard } from '../features/booking/BookingWizard';
-import { articles, faqs } from '../data/site';
+import { StudioPanel } from '../features/workspace/StudioPanel';
+import { ScrollStory } from '../components/MotionSystem';
+import { useApi } from '../lib/queries';
+import type { ArticleData } from '../lib/types';
+import { BookingWizard } from '../features/booking/BookingFlow';
+import { faqs } from '../data/site';
 export default function Home() {
   const hero = useRef(null);
+  const journal=useApi<{articles:ArticleData[]}>('/articles');
+  const articles=journal.data?.articles||[];
   const { scrollYProgress } = useScroll({
     target: hero,
     offset: ['start start', 'end start'],
@@ -38,7 +43,7 @@ export default function Home() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7 }}
           >
-            <Label>FOR TATTOO PEOPLE. BY TATTOO PEOPLE.</Label>
+            <Label>YOUR CRAFT FIRST. EVERYTHING ELSE, SORTED.</Label>
           </motion.div>
           <h1 aria-label="More ink. Less admin.">
             {['MORE INK.', 'LESS', 'ADMIN.'].map((line, i) => (
@@ -54,8 +59,8 @@ export default function Home() {
                 >
                   {line}
                   {i === 1 && (
-                    <span className="hero-asterisk" aria-hidden="true">
-                      ✳
+                    <span className="hero-pen-mark" aria-hidden="true">
+                      <PenTool />
                     </span>
                   )}
                 </motion.span>
@@ -81,9 +86,9 @@ export default function Home() {
               </Button>
               <button className="play-link" onClick={() => setBooking(true)}>
                 <span>
-                  <Play size={12} fill="currentColor" />
+                  <PenTool size={12} />
                 </span>{' '}
-                Take a look around
+                Book your next piece
               </button>
             </div>
             <span className="hero-caption">Booking, payments & a little more freedom.</span>
@@ -124,7 +129,7 @@ export default function Home() {
               <small>Less time in your DMs.</small>
             </div>
             <span className="notification-flower" aria-hidden="true">
-              ✳
+              ↗
             </span>
           </motion.div>
           <a className="hero-scroll" href="#the-good-stuff" aria-label="Scroll to explore">
@@ -137,8 +142,8 @@ export default function Home() {
         <div>
           {Array.from({ length: 4 }, (_, i) => (
             <span key={i}>
-              YOUR ART. YOUR RULES. YOUR VENUE. <span>✳</span> LESS BACK & FORTH. MORE GOING
-              FORWARD. <span>✳</span>
+              YOUR ART. YOUR RULES. YOUR VENUE. <span>↗</span> LESS BACK & FORTH. MORE GOING
+              FORWARD. <span>↗</span>
             </span>
           ))}
         </div>
@@ -165,6 +170,7 @@ export default function Home() {
           </Reveal>
         </div>
       </section>
+      <ScrollStory />
       <section className="product-section">
         <div className="container">
           <div className="section-heading">
@@ -181,7 +187,7 @@ export default function Home() {
                 <br />
                 Go on. Make yourself at home.
               </p>
-              <ArrowLink to="/demo">Explore the workspace</ArrowLink>
+              <ArrowLink to="/dashboard">Explore the workspace</ArrowLink>
             </Reveal>
           </div>
           <Reveal className="product-stage">
@@ -190,7 +196,7 @@ export default function Home() {
               <br />
               MORE YES.<span>↙</span>
             </div>
-            <StudioDemo />
+            <StudioPanel />
           </Reveal>
           <div className="feature-strip">
             {[
@@ -209,7 +215,7 @@ export default function Home() {
               {
                 icon: CreditCard,
                 title: 'Payments without the chase',
-                text: 'Deposits to the finishing touches.',
+                text: 'Choose your method. Coordinate by email.',
                 to: '/payments',
               },
               {
@@ -240,7 +246,7 @@ export default function Home() {
           <div className="round-stamp" aria-hidden="true">
             STAY TRUE
             <br />
-            <span>✳</span>
+            <span>↗</span>
             <br />
             TO YOUR ART
           </div>
@@ -315,7 +321,7 @@ export default function Home() {
             </Reveal>
           </div>
           <p className="image-context">
-            Photography is an editorial showcase, not bookable artist inventory.
+            An editorial look at line, form and the craft.
           </p>
         </div>
       </section>
@@ -372,24 +378,16 @@ export default function Home() {
             <div className="phone-frame">
               <span className="phone-island" />
               <div className="phone-app">
-                <span className="wordmark">venue✳</span>
+                <span className="wordmark">venue↗</span>
                 <small>YOUR SPACE, ANYWHERE</small>
                 <h3>
                   Hey, artist.
                   <br />
                   Make it a good one.
                 </h3>
-                <div className="phone-date">MONDAY, NOVEMBER 2</div>
-                <div className="phone-appointment">
-                  <span className="status">EXAMPLE APPOINTMENT</span>
-                  <strong>A little botanical magic</strong>
-                  <span>10:00 AM · Custom piece</span>
-                  <i>All the details. Right here.</i>
-                </div>
-                <div className="phone-appointment violet">
-                  <strong>Time to create.</strong>
-                  <span>Your calendar, on your terms.</span>
-                </div>
+                <div className="phone-date">{new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase()}</div>
+                <Link className="phone-appointment" to="/booking"><span className="status">YOUR NEXT CHAPTER</span><strong>Make your next mark.</strong><span>Find an artist. Share the idea.</span><i>Book a session ↗</i></Link>
+                <Link className="phone-appointment violet" to="/dashboard"><strong>Your work, together.</strong><span>Bookings. Conversations. Headspace.</span></Link>
                 <nav>
                   <CalendarDays />
                   <MessageSquare />
@@ -424,21 +422,21 @@ export default function Home() {
             Grow your own way.
           </h2>
           <p>
-            Solo and Studio have no monthly subscription.
+            Create your account and bring your books together.
             <br />
-            Card processing fees apply. Pro plans are available as you grow.
+            Service prices and custom quotes are agreed with your artist.
           </p>
           <ArrowLink to="/pricing">Find the fit for your books</ArrowLink>
         </Reveal>
         <Reveal className="pricing-teaser-number">
-          <span>SOLO</span>
+          <span>PLATFORM ACCESS</span>
           <div>
             $0<small>/ month</small>
           </div>
           <p>
-            10% card processing fee.
+            Your account. Your workspace.
             <br />
-            Charged to clients by default.
+            Service quotes stay with your artist.
           </p>
           <span className="pricing-scribble" aria-hidden="true">
             less overhead.
@@ -473,7 +471,7 @@ export default function Home() {
                 <article className="journal-card embla-slide" key={a.slug}>
                   <Link to={`/journal/${a.slug}`}>
                     <div className="journal-image">
-                      <Photo name={a.image} alt={a.originalTitle} />
+                      <Photo name={a.image_name} alt={a.title} />
                       <span className="journal-arrow">
                         <ArrowUpRight />
                       </span>

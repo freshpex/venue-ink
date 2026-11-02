@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "dev:server": "node --env-file-if-exists=.env --watch server/index.mjs",
+    "dev:server": "node --env-file-if-exists=.env --watch server/start.mjs",
     "build": "tsc -b && vite build && node scripts/prerender.mjs",
     "preview": "vite preview --host 0.0.0.0",
-    "start": "node --env-file-if-exists=.env server/index.mjs",
+    "start": "node --env-file-if-exists=.env server/start.mjs",
     "lint": "eslint .",
     "test": "vitest run",
     "test:e2e": "playwright test",
