@@ -1,4 +1,4 @@
-const configured = import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "";
+const configured = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
 export const apiBase = configured;
 export class ApiError extends Error {
   status: number;
@@ -16,10 +16,10 @@ export async function request<T>(
   try {
     response = await fetch(`${apiBase}/api${path}`, {
       ...options,
-      credentials: "include",
+      credentials: 'include',
       headers: {
-        "Content-Type": "application/json",
-        "X-Requested-With": "VenueWorkspace",
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'VenueWorkspace',
         ...options.headers,
       },
       signal: signal
@@ -28,19 +28,13 @@ export async function request<T>(
     });
   } catch (e) {
     if (signal?.aborted) throw e;
-    throw new ApiError(
-      "The server could not be reached. Check the connection and try again.",
-      0,
-    );
+    throw new ApiError('The server could not be reached. Check the connection and try again.', 0);
   }
   const data = await response
     .json()
-    .catch(() => ({ message: "The server returned an unexpected response." }));
+    .catch(() => ({ message: 'The server returned an unexpected response.' }));
   if (!response.ok)
-    throw new ApiError(
-      data.message || "The request could not be completed.",
-      response.status,
-    );
+    throw new ApiError(data.message || 'The request could not be completed.', response.status);
   return data as T;
 }
 export async function waitForServer(
@@ -49,31 +43,29 @@ export async function waitForServer(
   options = { timeoutMs: 150000, pollMs: 3000 },
 ) {
   const deadline = Date.now() + options.timeoutMs;
-  onState("Connecting to server…");
+  onState('Connecting to server…');
   while (Date.now() < deadline) {
     signal.throwIfAborted();
     try {
       const result = await request<{ ready: boolean }>(
-        "/health",
+        '/health',
         {},
         AbortSignal.any([
           signal,
-          AbortSignal.timeout(
-            Math.max(1, Math.min(8000, deadline - Date.now())),
-          ),
+          AbortSignal.timeout(Math.max(1, Math.min(8000, deadline - Date.now()))),
         ]),
       );
       if (result.ready) {
-        onState("Signing you in…");
+        onState('Signing you in…');
         return;
       }
     } catch {
       signal.throwIfAborted();
     }
-    onState("Server is waking up. Connecting…");
+    onState('Server is waking up. Connecting…');
     await new Promise<void>((resolve, reject) => {
       const finish = () => {
-        signal.removeEventListener("abort", abort);
+        signal.removeEventListener('abort', abort);
         resolve();
       };
       const timer = setTimeout(
@@ -82,13 +74,13 @@ export async function waitForServer(
       );
       const abort = () => {
         clearTimeout(timer);
-        reject(new DOMException("Cancelled", "AbortError"));
+        reject(new DOMException('Cancelled', 'AbortError'));
       };
-      signal.addEventListener("abort", abort, { once: true });
+      signal.addEventListener('abort', abort, { once: true });
     });
   }
   throw new ApiError(
-    "The server is taking longer than expected. Your details are still here; try connecting again.",
+    'The server is taking longer than expected. Your details are still here; try connecting again.',
     503,
   );
 }

@@ -1,46 +1,39 @@
-import { useEffect, useState } from "react";
-import * as Dialog from "@radix-ui/react-dialog";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import {
-  ArrowRight,
-  ArrowLeft,
-  Check,
-  X,
-  Upload,
-  CalendarDays,
-} from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
-import { Button } from "../../components/ui/button";
-import { useDemo } from "../demo/store";
-import { toast } from "sonner";
+import { useEffect, useState } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { ArrowRight, ArrowLeft, Check, X, Upload, CalendarDays } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { Button } from '../../components/ui/button';
+import { useDemo } from '../demo/store';
+import { toast } from 'sonner';
 const schema = z.object({
-  name: z.string().trim().min(2, "Enter an example name"),
-  email: z.email("Enter a valid example email"),
+  name: z.string().trim().min(2, 'Enter an example name'),
+  email: z.email('Enter a valid example email'),
   notes: z.string().max(1000),
   consent: z.literal(true, {
-    error: "Confirm that you understand this is an example",
+    error: 'Confirm that you understand this is an example',
   }),
 });
 type Values = z.infer<typeof schema>;
 export function BookingWizard({
   open,
   onOpenChange,
-  design: initialDesign = "Custom artwork",
+  design: initialDesign = 'Custom artwork',
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   design?: string;
 }) {
   const [step, setStep] = useState(0);
-  const [artist, setArtist] = useState("Alex");
-  const [service, setService] = useState("Custom tattoo");
-  const [placement, setPlacement] = useState("Forearm");
-  const [size, setSize] = useState("Medium · 10–15 cm");
+  const [artist, setArtist] = useState('Alex');
+  const [service, setService] = useState('Custom tattoo');
+  const [placement, setPlacement] = useState('Forearm');
+  const [size, setSize] = useState('Medium · 10–15 cm');
   const [day, setDay] = useState(12);
-  const [time, setTime] = useState("10:00");
-  const [preview, setPreview] = useState("");
+  const [time, setTime] = useState('10:00');
+  const [preview, setPreview] = useState('');
   const [done, setDone] = useState(false);
   const add = useDemo((s) => s.add);
   const requests = useDemo((s) => s.requests);
@@ -52,9 +45,9 @@ export function BookingWizard({
   } = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: {
-      name: "Example client",
-      email: "client@example.com",
-      notes: "",
+      name: 'Example client',
+      email: 'client@example.com',
+      notes: '',
     },
   });
   useEffect(
@@ -68,44 +61,31 @@ export function BookingWizard({
       setStep(0);
       setDone(false);
       reset();
-      setPreview("");
+      setPreview('');
     }
   }, [open, reset]);
   function submit() {
     if (step !== 4 || done) return;
     if (
       requests.some(
-        (r) =>
-          r.day === day &&
-          r.time === time &&
-          r.artist === artist &&
-          r.status !== "Declined",
+        (r) => r.day === day && r.time === time && r.artist === artist && r.status !== 'Declined',
       )
     ) {
-      toast.error("That example slot is occupied. Choose another time.");
+      toast.error('That example slot is occupied. Choose another time.');
       setStep(2);
       return;
     }
     add({ design: initialDesign, artist, day, time, service });
     setDone(true);
-    toast.success("Example request added to your local demo workspace");
+    toast.success('Example request added to your local demo workspace');
   }
-  const steps = [
-    "The artist",
-    "Your idea",
-    "The date",
-    "Your details",
-    "Review",
-  ];
+  const steps = ['The artist', 'Your idea', 'The date', 'Your details', 'Review'];
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
         <Dialog.Content className="booking-dialog">
-          <Dialog.Close
-            className="icon-button dialog-close"
-            aria-label="Close booking example"
-          >
+          <Dialog.Close className="icon-button dialog-close" aria-label="Close booking example">
             <X size={22} />
           </Dialog.Close>
           <div className="booking-dialog-head">
@@ -113,13 +93,10 @@ export function BookingWizard({
               <i /> Booking example
             </span>
             <Dialog.Title>
-              {done
-                ? "Look at that. You’re organized."
-                : "Your next great piece starts here."}
+              {done ? 'Look at that. You’re organized.' : 'Your next great piece starts here.'}
             </Dialog.Title>
             <Dialog.Description>
-              No real appointment or payment is created. Please use example
-              details.
+              No real appointment or payment is created. Please use example details.
             </Dialog.Description>
           </div>
           {done ? (
@@ -134,8 +111,8 @@ export function BookingWizard({
                 Example day {day} at {time}
               </p>
               <p className="fine-print">
-                The artist has not been contacted. Explore the Requests tab in
-                the studio demo to approve this example.
+                The artist has not been contacted. Explore the Requests tab in the studio demo to
+                approve this example.
               </p>
               <Button onClick={() => onOpenChange(false)}>
                 Back to exploring <ArrowRight size={18} />
@@ -147,21 +124,23 @@ export function BookingWizard({
                 {steps.map((s, i) => (
                   <li
                     key={s}
-                    aria-current={step === i ? "step" : undefined}
-                    className={step >= i ? "active" : ""}
+                    aria-current={step === i ? 'step' : undefined}
+                    className={step >= i ? 'active' : ''}
                   >
                     <span>{step > i ? <Check size={12} /> : i + 1}</span>
                     <small>{s}</small>
                   </li>
                 ))}
               </ol>
-              <form onSubmit={(event) => {
-                event.preventDefault();
-                const submitter = (event.nativeEvent as SubmitEvent).submitter;
-                if (step === 4 && submitter?.getAttribute('data-final-booking') === 'true') {
-                  void handleSubmit(submit)(event);
-                }
-              }}>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const submitter = (event.nativeEvent as SubmitEvent).submitter;
+                  if (step === 4 && submitter?.getAttribute('data-final-booking') === 'true') {
+                    void handleSubmit(submit)(event);
+                  }
+                }}
+              >
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={step}
@@ -176,19 +155,17 @@ export function BookingWizard({
                         <h3>Find your creative fit.</h3>
                         <p>Fictional artists for this walkthrough.</p>
                         <div className="option-grid">
-                          {["Alex", "River"].map((a, i) => (
+                          {['Alex', 'River'].map((a, i) => (
                             <button
                               type="button"
-                              className={`artist-option ${artist === a ? "selected" : ""}`}
+                              className={`artist-option ${artist === a ? 'selected' : ''}`}
                               onClick={() => setArtist(a)}
                               key={a}
                             >
                               <span className="avatar large">{a[0]}</span>
                               <strong>{a}</strong>
                               <small>
-                                {i
-                                  ? "Ornamental & blackwork"
-                                  : "Botanical & fine line"}
+                                {i ? 'Ornamental & blackwork' : 'Botanical & fine line'}
                               </small>
                               {artist === a && <Check size={18} />}
                             </button>
@@ -196,10 +173,7 @@ export function BookingWizard({
                         </div>
                         <label>
                           Service
-                          <select
-                            value={service}
-                            onChange={(e) => setService(e.target.value)}
-                          >
+                          <select value={service} onChange={(e) => setService(e.target.value)}>
                             <option>Custom tattoo</option>
                             <option>Flash tattoo</option>
                             <option>Piercing consultation</option>
@@ -219,11 +193,11 @@ export function BookingWizard({
                               onChange={(e) => setPlacement(e.target.value)}
                             >
                               {[
-                                "Forearm",
-                                "Upper arm",
-                                "Leg",
-                                "Back",
-                                "Other / discuss with artist",
+                                'Forearm',
+                                'Upper arm',
+                                'Leg',
+                                'Back',
+                                'Other / discuss with artist',
                               ].map((p) => (
                                 <option key={p}>{p}</option>
                               ))}
@@ -231,15 +205,12 @@ export function BookingWizard({
                           </label>
                           <label>
                             Approximate size
-                            <select
-                              value={size}
-                              onChange={(e) => setSize(e.target.value)}
-                            >
+                            <select value={size} onChange={(e) => setSize(e.target.value)}>
                               {[
-                                "Small · under 10 cm",
-                                "Medium · 10–15 cm",
-                                "Large · over 15 cm",
-                                "Discuss with artist",
+                                'Small · under 10 cm',
+                                'Medium · 10–15 cm',
+                                'Large · over 15 cm',
+                                'Discuss with artist',
                               ].map((s) => (
                                 <option key={s}>{s}</option>
                               ))}
@@ -249,7 +220,7 @@ export function BookingWizard({
                         <label>
                           Creative notes
                           <textarea
-                            {...register("notes")}
+                            {...register('notes')}
                             placeholder="A little about the direction…"
                             rows={3}
                           />
@@ -258,10 +229,7 @@ export function BookingWizard({
                           <Upload size={20} />
                           <span>
                             Add a reference image
-                            <small>
-                              JPEG, PNG or WebP · maximum 5 MB · stays in this
-                              browser
-                            </small>
+                            <small>JPEG, PNG or WebP · maximum 5 MB · stays in this browser</small>
                           </span>
                           <input
                             type="file"
@@ -270,34 +238,22 @@ export function BookingWizard({
                               const file = e.target.files?.[0];
                               if (!file) return;
                               if (
-                                ![
-                                  "image/jpeg",
-                                  "image/png",
-                                  "image/webp",
-                                ].includes(file.type) ||
+                                !['image/jpeg', 'image/png', 'image/webp'].includes(file.type) ||
                                 file.size > 5 * 1024 * 1024
                               ) {
-                                toast.error(
-                                  "Choose a JPEG, PNG or WebP under 5 MB",
-                                );
-                                e.target.value = "";
+                                toast.error('Choose a JPEG, PNG or WebP under 5 MB');
+                                e.target.value = '';
                                 return;
                               }
                               setPreview(URL.createObjectURL(file));
-                              toast("Reference selected locally");
+                              toast('Reference selected locally');
                             }}
                           />
                         </label>
                         {preview && (
                           <div className="upload-preview">
-                            <img
-                              src={preview}
-                              alt="Your locally selected reference"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setPreview("")}
-                            >
+                            <img src={preview} alt="Your locally selected reference" />
+                            <button type="button" onClick={() => setPreview('')}>
                               Remove reference
                             </button>
                           </div>
@@ -306,19 +262,15 @@ export function BookingWizard({
                     ) : step === 2 ? (
                       <>
                         <h3>A little space in the calendar.</h3>
-                        <p>
-                          Illustrative dates only. These are not live artist
-                          availability.
-                        </p>
+                        <p>Illustrative dates only. These are not live artist availability.</p>
                         <div className="booking-date">
-                          <CalendarDays size={20} /> Example month · choose a
-                          day
+                          <CalendarDays size={20} /> Example month · choose a day
                         </div>
                         <div className="date-options">
                           {[12, 13, 14, 15, 16, 17, 18, 19].map((d) => (
                             <button
                               type="button"
-                              className={day === d ? "selected" : ""}
+                              className={day === d ? 'selected' : ''}
                               key={d}
                               onClick={() => setDay(d)}
                             >
@@ -328,18 +280,8 @@ export function BookingWizard({
                         </div>
                         <label>
                           Preferred time
-                          <select
-                            value={time}
-                            onChange={(e) => setTime(e.target.value)}
-                          >
-                            {[
-                              "10:00",
-                              "11:00",
-                              "13:00",
-                              "14:00",
-                              "15:00",
-                              "16:00",
-                            ].map((t) => (
+                          <select value={time} onChange={(e) => setTime(e.target.value)}>
+                            {['10:00', '11:00', '13:00', '14:00', '15:00', '16:00'].map((t) => (
                               <option key={t}>{t}</option>
                             ))}
                           </select>
@@ -349,13 +291,13 @@ export function BookingWizard({
                       <>
                         <h3>Keep this one fictional.</h3>
                         <p>
-                          Example details help you try the flow without sharing
-                          personal information.
+                          Example details help you try the flow without sharing personal
+                          information.
                         </p>
                         <label>
                           Example name
                           <input
-                            {...register("name")}
+                            {...register('name')}
                             autoComplete="off"
                             aria-invalid={!!errors.name}
                             aria-describedby="name-error"
@@ -369,7 +311,7 @@ export function BookingWizard({
                         <label>
                           Example email
                           <input
-                            {...register("email")}
+                            {...register('email')}
                             type="email"
                             autoComplete="off"
                             aria-invalid={!!errors.email}
@@ -382,14 +324,11 @@ export function BookingWizard({
                           )}
                         </label>
                         <label className="checkbox-label">
-                          <input type="checkbox" {...register("consent")} /> I
-                          understand this is a local example, not a real
-                          appointment.
+                          <input type="checkbox" {...register('consent')} /> I understand this is a
+                          local example, not a real appointment.
                         </label>
                         {errors.consent && (
-                          <span className="field-error">
-                            {errors.consent.message}
-                          </span>
+                          <span className="field-error">{errors.consent.message}</span>
                         )}
                       </>
                     ) : (
@@ -397,13 +336,13 @@ export function BookingWizard({
                         <h3>One last look.</h3>
                         <dl className="booking-review">
                           {[
-                            ["Artist", artist],
-                            ["Artwork", initialDesign],
-                            ["Service", service],
-                            ["Placement", placement],
-                            ["Size", size],
-                            ["Preferred time", `Example day ${day} · ${time}`],
-                            ["Deposit", "No payment collected"],
+                            ['Artist', artist],
+                            ['Artwork', initialDesign],
+                            ['Service', service],
+                            ['Placement', placement],
+                            ['Size', size],
+                            ['Preferred time', `Example day ${day} · ${time}`],
+                            ['Deposit', 'No payment collected'],
                           ].map(([k, v]) => (
                             <div key={k}>
                               <dt>{k}</dt>
@@ -412,10 +351,9 @@ export function BookingWizard({
                           ))}
                         </dl>
                         <p className="fine-print">
-                          In the live product, the artist reviews requests and
-                          provides applicable booking and deposit terms. This
-                          example only saves a fictional request in this
-                          browser.
+                          In the live product, the artist reviews requests and provides applicable
+                          booking and deposit terms. This example only saves a fictional request in
+                          this browser.
                         </p>
                       </>
                     )}
@@ -423,11 +361,7 @@ export function BookingWizard({
                 </AnimatePresence>
                 <div className="booking-actions">
                   {step > 0 ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => setStep(step - 1)}
-                    >
+                    <Button type="button" variant="ghost" onClick={() => setStep(step - 1)}>
                       <ArrowLeft size={17} /> Back
                     </Button>
                   ) : (
@@ -440,14 +374,12 @@ export function BookingWizard({
                       onClick={async (event) => {
                         event.preventDefault();
                         if (step === 3) {
-                          const valid = await new Promise<boolean>(
-                            (resolve) => {
-                              handleSubmit(
-                                () => resolve(true),
-                                () => resolve(false),
-                              )();
-                            },
-                          );
+                          const valid = await new Promise<boolean>((resolve) => {
+                            handleSubmit(
+                              () => resolve(true),
+                              () => resolve(false),
+                            )();
+                          });
                           if (!valid) return;
                         }
                         setStep(step + 1);

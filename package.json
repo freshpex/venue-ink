@@ -11,7 +11,11 @@
     "start": "node --env-file-if-exists=.env server/index.mjs",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:setup": "node --env-file-if-exists=.env scripts/setup-database.mjs",
+    "db:seed": "node --env-file-if-exists=.env scripts/setup-database.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -24,6 +28,7 @@
     "clsx": "^2.1.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "drizzle-orm": "^0.45.4",
     "embla-carousel-react": "^8.6.0",
     "express": "^5.1.0",
     "express-rate-limit": "^8.2.1",

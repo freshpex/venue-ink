@@ -1,11 +1,6 @@
-import { useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import {
-  motion,
-  useScroll,
-  useTransform,
-  useReducedMotion,
-} from "motion/react";
+import { useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { motion, useScroll, useTransform, useReducedMotion } from 'motion/react';
 import {
   ArrowUpRight,
   ArrowDown,
@@ -17,30 +12,23 @@ import {
   Check,
   Play,
   Palette,
-} from "lucide-react";
-import useEmblaCarousel from "embla-carousel-react";
-import { Button } from "../components/ui/button";
-import {
-  Photo,
-  Reveal,
-  Label,
-  ArrowLink,
-  CTA,
-  FAQs,
-} from "../components/Primitives";
-import { StudioDemo } from "../features/demo/StudioDemo";
-import { BookingWizard } from "../features/booking/BookingWizard";
-import { articles, faqs } from "../data/site";
+} from 'lucide-react';
+import useEmblaCarousel from 'embla-carousel-react';
+import { Button } from '../components/ui/button';
+import { Photo, Reveal, Label, ArrowLink, CTA, FAQs } from '../components/Primitives';
+import { StudioDemo } from '../features/demo/StudioDemo';
+import { BookingWizard } from '../features/booking/BookingWizard';
+import { articles, faqs } from '../data/site';
 export default function Home() {
   const hero = useRef(null);
   const { scrollYProgress } = useScroll({
     target: hero,
-    offset: ["start start", "end start"],
+    offset: ['start start', 'end start'],
   });
-  const y = useTransform(scrollYProgress, [0, 1], ["0%", "16%"]);
+  const y = useTransform(scrollYProgress, [0, 1], ['0%', '16%']);
   const reduced = useReducedMotion();
   const [booking, setBooking] = useState(false);
-  const [carousel, api] = useEmblaCarousel({ align: "start", loop: false });
+  const [carousel, api] = useEmblaCarousel({ align: 'start', loop: false });
   return (
     <>
       <section className="hero" ref={hero}>
@@ -53,10 +41,10 @@ export default function Home() {
             <Label>FOR TATTOO PEOPLE. BY TATTOO PEOPLE.</Label>
           </motion.div>
           <h1 aria-label="More ink. Less admin.">
-            {["MORE INK.", "LESS", "ADMIN."].map((line, i) => (
+            {['MORE INK.', 'LESS', 'ADMIN.'].map((line, i) => (
               <span className={`hero-line line-${i}`} key={line}>
                 <motion.span
-                  initial={reduced ? false : { y: "110%", rotate: 3 }}
+                  initial={reduced ? false : { y: '110%', rotate: 3 }}
                   animate={{ y: 0, rotate: 0 }}
                   transition={{
                     duration: 0.85,
@@ -94,21 +82,19 @@ export default function Home() {
               <button className="play-link" onClick={() => setBooking(true)}>
                 <span>
                   <Play size={12} fill="currentColor" />
-                </span>{" "}
+                </span>{' '}
                 Take a look around
               </button>
             </div>
-            <span className="hero-caption">
-              Booking, payments & a little more freedom.
-            </span>
+            <span className="hero-caption">Booking, payments & a little more freedom.</span>
           </motion.div>
         </div>
         <div className="hero-visual">
           <motion.div
             className="hero-photo-wrap"
             style={{ y: reduced ? 0 : y }}
-            initial={reduced ? false : { clipPath: "inset(0 100% 0 0)" }}
-            animate={{ clipPath: "inset(0 0% 0 0)" }}
+            initial={reduced ? false : { clipPath: 'inset(0 100% 0 0)' }}
+            animate={{ clipPath: 'inset(0 0% 0 0)' }}
             transition={{
               duration: 1.1,
               delay: 0.15,
@@ -128,7 +114,7 @@ export default function Home() {
             className="booking-notification"
             initial={reduced ? false : { opacity: 0, y: 30, rotate: -5 }}
             animate={{ opacity: 1, y: 0, rotate: -3 }}
-            transition={{ delay: 1, duration: 0.8, type: "spring" }}
+            transition={{ delay: 1, duration: 0.8, type: 'spring' }}
           >
             <span className="notification-check">
               <Check size={19} />
@@ -141,24 +127,18 @@ export default function Home() {
               ✳
             </span>
           </motion.div>
-          <a
-            className="hero-scroll"
-            href="#the-good-stuff"
-            aria-label="Scroll to explore"
-          >
+          <a className="hero-scroll" href="#the-good-stuff" aria-label="Scroll to explore">
             <ArrowDown size={21} />
           </a>
-          <span className="vertical-caption">
-            MADE FOR THE ART. AND THE ARTIST.
-          </span>
+          <span className="vertical-caption">MADE FOR THE ART. AND THE ARTIST.</span>
         </div>
       </section>
       <div className="marquee" aria-hidden="true">
         <div>
           {Array.from({ length: 4 }, (_, i) => (
             <span key={i}>
-              YOUR ART. YOUR RULES. YOUR VENUE. <span>✳</span> LESS BACK &
-              FORTH. MORE GOING FORWARD. <span>✳</span>
+              YOUR ART. YOUR RULES. YOUR VENUE. <span>✳</span> LESS BACK & FORTH. MORE GOING
+              FORWARD. <span>✳</span>
             </span>
           ))}
         </div>
@@ -176,14 +156,10 @@ export default function Home() {
             </h2>
           </Reveal>
           <Reveal delay={0.15}>
+            <p>The late-night DMs. The back-and-forth. The “did you get my deposit?”</p>
             <p>
-              The late-night DMs. The back-and-forth. The “did you get my
-              deposit?”
-            </p>
-            <p>
-              Bring bookings, flash, payments and conversations into one place.
-              Less of the business getting in the way. More of you doing your
-              thing.
+              Bring bookings, flash, payments and conversations into one place. Less of the business
+              getting in the way. More of you doing your thing.
             </p>
             <ArrowLink to="/features">Meet your new studio assistant</ArrowLink>
           </Reveal>
@@ -220,27 +196,27 @@ export default function Home() {
             {[
               {
                 icon: CalendarDays,
-                title: "Books that work for you",
-                text: "Your availability. Your boundaries.",
-                to: "/booking",
+                title: 'Books that work for you',
+                text: 'Your availability. Your boundaries.',
+                to: '/booking',
               },
               {
                 icon: MessageSquare,
-                title: "Conversations, together",
-                text: "Keep the details out of your DMs.",
-                to: "/features",
+                title: 'Conversations, together',
+                text: 'Keep the details out of your DMs.',
+                to: '/features',
               },
               {
                 icon: CreditCard,
-                title: "Payments without the chase",
-                text: "Deposits to the finishing touches.",
-                to: "/payments",
+                title: 'Payments without the chase',
+                text: 'Deposits to the finishing touches.',
+                to: '/payments',
               },
               {
                 icon: Link2,
-                title: "A home for your work",
-                text: "One link. Entirely your world.",
-                to: "/artist-websites",
+                title: 'A home for your work',
+                text: 'One link. Entirely your world.',
+                to: '/artist-websites',
               },
             ].map((f, i) => (
               <Reveal delay={i * 0.07} key={f.title}>
@@ -258,10 +234,7 @@ export default function Home() {
       <section className="artist-editorial container">
         <div className="editorial-photo">
           <Reveal>
-            <Photo
-              name="artist-at-work"
-              alt="Tattoo artist carefully working with a client"
-            />
+            <Photo name="artist-at-work" alt="Tattoo artist carefully working with a client" />
           </Reveal>
           <span className="photo-corner">01 / THE INDEPENDENTS</span>
           <div className="round-stamp" aria-hidden="true">
@@ -282,12 +255,10 @@ export default function Home() {
             <span className="serif-word">Your rules.</span>
           </h2>
           <p>
-            From your first flash drop to your next guest spot. A booking space
-            that works the way you do, and looks like you, too.
+            From your first flash drop to your next guest spot. A booking space that works the way
+            you do, and looks like you, too.
           </p>
-          <ArrowLink to="/for-tattoo-artists">
-            Made for independent artists
-          </ArrowLink>
+          <ArrowLink to="/for-tattoo-artists">Made for independent artists</ArrowLink>
         </Reveal>
       </section>
       <section className="flash-section">
@@ -303,8 +274,8 @@ export default function Home() {
             </Reveal>
             <Reveal>
               <p>
-                Your flash deserves more than a disappearing story. Give every
-                collection a place to live, be found and be booked.
+                Your flash deserves more than a disappearing story. Give every collection a place to
+                live, be found and be booked.
               </p>
               <ArrowLink light to="/flash">
                 Explore flash collections
@@ -314,10 +285,7 @@ export default function Home() {
           <div className="flash-editorial-grid">
             <Reveal>
               <Link to="/flash" className="flash-photo-card">
-                <Photo
-                  name="tattoo-floral-detail"
-                  alt="Detailed floral tattoo artwork on skin"
-                />
+                <Photo name="tattoo-floral-detail" alt="Detailed floral tattoo artwork on skin" />
                 <div>
                   <span>THE BOTANICAL STUDIES</span>
                   <ArrowUpRight />
@@ -338,10 +306,7 @@ export default function Home() {
             </Reveal>
             <Reveal delay={0.24}>
               <Link to="/flash" className="flash-photo-card">
-                <Photo
-                  name="tattoo-arm-floral"
-                  alt="Floral tattoo detail on a tattooed arm"
-                />
+                <Photo name="tattoo-arm-floral" alt="Floral tattoo detail on a tattooed arm" />
                 <div>
                   <span>SMALL MARKS. BIG FEELINGS.</span>
                   <ArrowUpRight />
@@ -363,9 +328,8 @@ export default function Home() {
             One <span className="serif-word">happy studio.</span>
           </h2>
           <p>
-            A shared calendar. Individual booking links. All your people, doing
-            what they do best. Keep the studio in sync without losing anyone’s
-            independence.
+            A shared calendar. Individual booking links. All your people, doing what they do best.
+            Keep the studio in sync without losing anyone’s independence.
           </p>
           <div className="tag-list">
             <span>Team calendars</span>
@@ -404,10 +368,7 @@ export default function Home() {
       <section className="mobile-promo">
         <div className="container mobile-promo-grid">
           <Reveal className="mobile-promo-visual">
-            <Photo
-              name="artist-portrait-woman"
-              alt="Creative tattoo artist in their studio"
-            />
+            <Photo name="artist-portrait-woman" alt="Creative tattoo artist in their studio" />
             <div className="phone-frame">
               <span className="phone-island" />
               <div className="phone-app">
@@ -447,8 +408,8 @@ export default function Home() {
               <span className="serif-word">freedom.</span>
             </h2>
             <p>
-              At the studio. On a guest spot. On the sofa. Keep your books close
-              and your options open with Venue for iOS and Android.
+              At the studio. On a guest spot. On the sofa. Keep your books close and your options
+              open with Venue for iOS and Android.
             </p>
             <ArrowLink to="/info/mobile-app">Take Venue with you</ArrowLink>
           </Reveal>
@@ -497,16 +458,10 @@ export default function Home() {
               </h2>
             </Reveal>
             <div className="carousel-controls">
-              <button
-                aria-label="Previous stories"
-                onClick={() => api?.scrollPrev()}
-              >
+              <button aria-label="Previous stories" onClick={() => api?.scrollPrev()}>
                 <ArrowLeftIcon />
               </button>
-              <button
-                aria-label="Next stories"
-                onClick={() => api?.scrollNext()}
-              >
+              <button aria-label="Next stories" onClick={() => api?.scrollNext()}>
                 <ArrowRight />
               </button>
               <ArrowLink to="/journal">The journal</ArrowLink>
@@ -554,5 +509,5 @@ export default function Home() {
   );
 }
 function ArrowLeftIcon() {
-  return <ArrowRight style={{ transform: "rotate(180deg)" }} />;
+  return <ArrowRight style={{ transform: 'rotate(180deg)' }} />;
 }

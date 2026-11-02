@@ -1,61 +1,54 @@
-import { useState } from "react";
-import * as Dialog from "@radix-ui/react-dialog";
-import {
-  ArrowUpRight,
-  X,
-  Search,
-  Heart,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "../components/ui/button";
-import { CTA, Label, PageIntro, Photo, Reveal } from "../components/Primitives";
-import { BookingWizard } from "../features/booking/BookingWizard";
+import { useState } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { ArrowUpRight, X, Search, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '../components/ui/button';
+import { CTA, Label, PageIntro, Photo, Reveal } from '../components/Primitives';
+import { BookingWizard } from '../features/booking/BookingWizard';
 const collection = [
   {
-    name: "The botanical study",
-    image: "tattoo-floral-detail",
-    category: "Botanical",
+    name: 'The botanical study',
+    image: 'tattoo-floral-detail',
+    category: 'Botanical',
   },
   {
-    name: "Lines with a life of their own",
-    image: "tattoo-back-art",
-    category: "Blackwork",
+    name: 'Lines with a life of their own',
+    image: 'tattoo-back-art',
+    category: 'Blackwork',
   },
   {
-    name: "Something worth keeping",
-    image: "tattoo-arm-floral",
-    category: "Botanical",
+    name: 'Something worth keeping',
+    image: 'tattoo-arm-floral',
+    category: 'Botanical',
   },
   {
-    name: "A quiet kind of statement",
-    image: "tattoo-hands",
-    category: "Details",
+    name: 'A quiet kind of statement',
+    image: 'tattoo-hands',
+    category: 'Details',
   },
-  { name: "Made by hand", image: "tattoo-overhead", category: "In the studio" },
-  { name: "A closer look", image: "tattoo-process", category: "Details" },
+  { name: 'Made by hand', image: 'tattoo-overhead', category: 'In the studio' },
+  { name: 'A closer look', image: 'tattoo-process', category: 'Details' },
   {
-    name: "Time, care, craft",
-    image: "client-session",
-    category: "In the studio",
+    name: 'Time, care, craft',
+    image: 'client-session',
+    category: 'In the studio',
   },
   {
-    name: "The next chapter",
-    image: "tattoo-consultation",
-    category: "In the studio",
+    name: 'The next chapter',
+    image: 'tattoo-consultation',
+    category: 'In the studio',
   },
 ];
 export default function Gallery() {
-  const [filter, setFilter] = useState("All work");
-  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState('All work');
+  const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<number | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [booking, setBooking] = useState(false);
-  const [design, setDesign] = useState("Custom artwork");
+  const [design, setDesign] = useState('Custom artwork');
   const items = collection.filter(
     (x) =>
-      (filter === "All work" || x.category === filter) &&
+      (filter === 'All work' || x.category === filter) &&
       x.name.toLowerCase().includes(search.toLowerCase()),
   );
   const current = selected === null ? null : items[selected];
@@ -69,16 +62,10 @@ export default function Gallery() {
       <section className="container gallery-page">
         <div className="gallery-controls">
           <div className="filter-list">
-            {[
-              "All work",
-              "Botanical",
-              "Blackwork",
-              "Details",
-              "In the studio",
-            ].map((f) => (
+            {['All work', 'Botanical', 'Blackwork', 'Details', 'In the studio'].map((f) => (
               <button
                 key={f}
-                className={f === filter ? "active" : ""}
+                className={f === filter ? 'active' : ''}
                 aria-pressed={f === filter}
                 onClick={() => {
                   setFilter(f);
@@ -105,8 +92,8 @@ export default function Gallery() {
         <div className="gallery-disclaimer">
           <Label>EDITORIAL COLLECTION SHOWCASE</Label>
           <p>
-            Real stock photography, illustrative collection names. These are not
-            available flash designs or Venue artist listings.
+            Real stock photography, illustrative collection names. These are not available flash
+            designs or Venue artist listings.
           </p>
         </div>
         <p className="sr-only" aria-live="polite">
@@ -114,11 +101,7 @@ export default function Gallery() {
         </p>
         <div className="gallery-masonry">
           {items.map((item, i) => (
-            <Reveal
-              className="gallery-item"
-              delay={(i % 3) * 0.06}
-              key={item.name}
-            >
+            <Reveal className="gallery-item" delay={(i % 3) * 0.06} key={item.name}>
               <button
                 className="gallery-image"
                 onClick={() => setSelected(i)}
@@ -135,24 +118,17 @@ export default function Gallery() {
                   <h2>{item.name}</h2>
                 </div>
                 <button
-                  className={`icon-button ${favorites.includes(item.name) ? "favorite" : ""}`}
-                  aria-label={`${favorites.includes(item.name) ? "Unsave" : "Save"} ${item.name}`}
+                  className={`icon-button ${favorites.includes(item.name) ? 'favorite' : ''}`}
+                  aria-label={`${favorites.includes(item.name) ? 'Unsave' : 'Save'} ${item.name}`}
                   aria-pressed={favorites.includes(item.name)}
                   onClick={() => {
                     setFavorites((s) =>
-                      s.includes(item.name)
-                        ? s.filter((n) => n !== item.name)
-                        : [...s, item.name],
+                      s.includes(item.name) ? s.filter((n) => n !== item.name) : [...s, item.name],
                     );
-                    toast("Example collection preference updated");
+                    toast('Example collection preference updated');
                   }}
                 >
-                  <Heart
-                    size={20}
-                    fill={
-                      favorites.includes(item.name) ? "currentColor" : "none"
-                    }
-                  />
+                  <Heart size={20} fill={favorites.includes(item.name) ? 'currentColor' : 'none'} />
                 </button>
               </div>
             </Reveal>
@@ -164,8 +140,8 @@ export default function Gallery() {
             <p>Try another search or collection.</p>
             <Button
               onClick={() => {
-                setSearch("");
-                setFilter("All work");
+                setSearch('');
+                setFilter('All work');
               }}
             >
               Show all work
@@ -183,23 +159,19 @@ export default function Gallery() {
               Lose the chaos.
             </h2>
             <p>
-              Venue lets artists organize flash, build collections and choose
-              whether a design is repeatable. Your booking link gives clients a
-              way to find the work and send a request.
+              Venue lets artists organize flash, build collections and choose whether a design is
+              repeatable. Your booking link gives clients a way to find the work and send a request.
             </p>
             <Button
               onClick={() => {
-                setDesign("Custom artwork");
+                setDesign('Custom artwork');
                 setBooking(true);
               }}
             >
               Try the booking example <ArrowUpRight size={18} />
             </Button>
           </Reveal>
-          <Photo
-            name="neon-tattoo-tools"
-            alt="Tattoo equipment in a colorful studio"
-          />
+          <Photo name="neon-tattoo-tools" alt="Tattoo equipment in a colorful studio" />
         </div>
       </section>
       <CTA />
@@ -212,10 +184,7 @@ export default function Gallery() {
         <Dialog.Portal>
           <Dialog.Overlay className="dialog-overlay lightbox-overlay" />
           <Dialog.Content className="lightbox">
-            <Dialog.Close
-              aria-label="Close image"
-              className="icon-button lightbox-close"
-            >
+            <Dialog.Close aria-label="Close image" className="icon-button lightbox-close">
               <X />
             </Dialog.Close>
             {current && (
@@ -241,9 +210,7 @@ export default function Gallery() {
                 <button
                   className="lightbox-prev icon-button"
                   aria-label="Previous photograph"
-                  onClick={() =>
-                    setSelected((selected! + items.length - 1) % items.length)
-                  }
+                  onClick={() => setSelected((selected! + items.length - 1) % items.length)}
                 >
                   <ChevronLeft />
                 </button>

@@ -1,15 +1,15 @@
-import { useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
-import { ArrowUpRight, Plus } from "lucide-react";
-import * as Accordion from "@radix-ui/react-accordion";
-import { Link } from "react-router-dom";
-import type { ReactNode } from "react";
-import { Button } from "./ui/button";
-import images from "../data/image-manifest.json";
+import { useState } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
+import { ArrowUpRight, Plus } from 'lucide-react';
+import * as Accordion from '@radix-ui/react-accordion';
+import { Link } from 'react-router-dom';
+import type { ReactNode } from 'react';
+import { Button } from './ui/button';
+import images from '../data/image-manifest.json';
 export function Photo({
   name,
-  alt = "",
-  className = "",
+  alt = '',
+  className = '',
   eager = false,
   position,
 }: {
@@ -24,7 +24,7 @@ export function Photo({
   return (
     <img
       className={`photo ${className}`}
-      src={failed ? "/image-fallback.svg" : `/images/${name}.webp`}
+      src={failed ? '/image-fallback.svg' : `/images/${name}.webp`}
       srcSet={
         failed
           ? undefined
@@ -34,8 +34,8 @@ export function Photo({
       width={entry?.width || 1600}
       height={entry?.height || 1200}
       alt={entry?.alt || alt}
-      loading={eager ? "eager" : "lazy"}
-      fetchPriority={eager ? "high" : "auto"}
+      loading={eager ? 'eager' : 'lazy'}
+      fetchPriority={eager ? 'high' : 'auto'}
       style={{ objectPosition: position }}
       onError={() => setFailed(true)}
     />
@@ -43,7 +43,7 @@ export function Photo({
 }
 export function Reveal({
   children,
-  className = "",
+  className = '',
   delay = 0,
 }: {
   children: ReactNode;
@@ -54,10 +54,8 @@ export function Reveal({
   return (
     <motion.div
       className={className}
-      initial={
-        reduced ? false : { opacity: 0, y: 45, clipPath: "inset(6% 0 0 0)" }
-      }
-      whileInView={{ opacity: 1, y: 0, clipPath: "inset(0% 0 0 0)" }}
+      initial={reduced ? false : { opacity: 0, y: 45, clipPath: 'inset(6% 0 0 0)' }}
+      whileInView={{ opacity: 1, y: 0, clipPath: 'inset(0% 0 0 0)' }}
       viewport={{ once: true, amount: 0.12 }}
       transition={{ duration: 0.7, delay, ease: [0.22, 1, 0.36, 1] }}
     >
@@ -65,15 +63,9 @@ export function Reveal({
     </motion.div>
   );
 }
-export function Label({
-  children,
-  light = false,
-}: {
-  children: ReactNode;
-  light?: boolean;
-}) {
+export function Label({ children, light = false }: { children: ReactNode; light?: boolean }) {
   return (
-    <span className={`eyebrow ${light ? "eyebrow-light" : ""}`}>
+    <span className={`eyebrow ${light ? 'eyebrow-light' : ''}`}>
       <span className="little-cross">✳</span>
       {children}
     </span>
@@ -89,15 +81,15 @@ export function ArrowLink({
   light?: boolean;
 }) {
   return (
-    <Link className={`arrow-link ${light ? "light" : ""}`} to={to}>
+    <Link className={`arrow-link ${light ? 'light' : ''}`} to={to}>
       {children}
       <ArrowUpRight size={21} />
     </Link>
   );
 }
 export function CTA({
-  title = "Your next chapter. Less admin.",
-  text = "Make more space for what you got into this for.",
+  title = 'Your next chapter. Less admin.',
+  text = 'Make more space for what you got into this for.',
 }: {
   title?: string;
   text?: string;
@@ -116,9 +108,7 @@ export function CTA({
             Find your Venue <ArrowUpRight size={19} />
           </Link>
         </Button>
-        <span className="cta-note">
-          For independent artists. For the whole studio.
-        </span>
+        <span className="cta-note">For independent artists. For the whole studio.</span>
       </Reveal>
     </section>
   );
@@ -142,15 +132,7 @@ export function FAQs({ items }: { items: { q: string; a: string }[] }) {
     </Accordion.Root>
   );
 }
-export function PageIntro({
-  label,
-  title,
-  text,
-}: {
-  label: string;
-  title: string;
-  text: string;
-}) {
+export function PageIntro({ label, title, text }: { label: string; title: string; text: string }) {
   return (
     <section className="page-intro container">
       <Reveal>

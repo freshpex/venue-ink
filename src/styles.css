@@ -1,10 +1,10 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 @theme {
   --color-ink: #1c1e19;
   --color-bone: #f3f2eb;
   --color-lime: #d2f75a;
-  --font-sans: "DM Sans", sans-serif;
-  --font-display: "Barlow Condensed", sans-serif;
+  --font-sans: 'DM Sans', sans-serif;
+  --font-display: 'Barlow Condensed', sans-serif;
 }
 :root {
   --ink: #1c1e19;
@@ -16,7 +16,7 @@
   --line: #d1d2c8;
   --radius: 5px;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
-  font-family: "DM Sans", sans-serif;
+  font-family: 'DM Sans', sans-serif;
   color: var(--ink);
   background: var(--bone);
   font-synthesis: none;
@@ -80,7 +80,7 @@ p {
 }
 h1,
 h2 {
-  font-family: "Barlow Condensed", sans-serif;
+  font-family: 'Barlow Condensed', sans-serif;
   font-weight: 600;
   letter-spacing: -0.025em;
   line-height: 0.98;
@@ -133,7 +133,7 @@ textarea {
 textarea {
   resize: vertical;
 }
-input[type="checkbox"] {
+input[type='checkbox'] {
   width: 18px;
   height: 18px;
   min-height: 0;
@@ -343,7 +343,7 @@ input[type="checkbox"] {
   padding: 15px 0;
 }
 .desktop-nav > a:after {
-  content: "";
+  content: '';
   position: absolute;
   bottom: 6px;
   height: 1px;
@@ -1203,7 +1203,7 @@ input[type="checkbox"] {
   left: -28px;
   bottom: 30px;
   padding: 20px 28px;
-  font-family: "Barlow Condensed", sans-serif;
+  font-family: 'Barlow Condensed', sans-serif;
   font-size: 26px;
   line-height: 1;
   transform: rotate(-5deg);
@@ -1373,13 +1373,13 @@ input[type="checkbox"] {
   letter-spacing: 0.1em;
 }
 .pricing-teaser-number > div {
-  font-family: "Barlow Condensed", sans-serif;
+  font-family: 'Barlow Condensed', sans-serif;
   font-size: 150px;
   line-height: 1;
   margin-top: 15px;
 }
 .pricing-teaser-number > div > small {
-  font-family: "DM Sans", sans-serif;
+  font-family: 'DM Sans', sans-serif;
   font-size: 12px;
   letter-spacing: 0;
   margin-left: 10px;
@@ -1462,7 +1462,7 @@ input[type="checkbox"] {
 }
 .journal-card h3,
 .journal-card h2 {
-  font-family: "Barlow Condensed", sans-serif;
+  font-family: 'Barlow Condensed', sans-serif;
   font-size: 30px;
   font-weight: 500;
   line-height: 1.06;
@@ -1505,7 +1505,7 @@ input[type="checkbox"] {
 .accordion h3 > button svg {
   transition: transform 0.3s;
 }
-.accordion h3 > button[data-state="open"] svg {
+.accordion h3 > button[data-state='open'] svg {
   transform: rotate(45deg);
 }
 .accordion [data-radix-collection-item] + div {
@@ -1594,7 +1594,7 @@ input[type="checkbox"] {
   font-size: 10px !important;
 }
 .footer-huge {
-  font-family: "Barlow Condensed", sans-serif;
+  font-family: 'Barlow Condensed', sans-serif;
   font-weight: 600;
   letter-spacing: -0.025em;
   font-size: clamp(90px, 14.8vw, 240px);
@@ -1918,7 +1918,7 @@ input[type="checkbox"] {
   background: #d2c5ec;
 }
 .theme-lavender h2 {
-  font-family: "Barlow Condensed", sans-serif;
+  font-family: 'Barlow Condensed', sans-serif;
   text-transform: uppercase;
   font-weight: 700;
 }
@@ -1995,7 +1995,7 @@ input[type="checkbox"] {
   max-width: 350px;
 }
 .plan-price {
-  font-family: "Barlow Condensed", sans-serif;
+  font-family: 'Barlow Condensed', sans-serif;
   font-size: 88px;
   display: flex;
   align-items: baseline;
@@ -2003,7 +2003,7 @@ input[type="checkbox"] {
   line-height: 1.2;
 }
 .plan-price small {
-  font-family: "DM Sans", sans-serif;
+  font-family: 'DM Sans', sans-serif;
   font-size: 10px;
 }
 .plan-card ul {
@@ -2078,7 +2078,7 @@ input[type="checkbox"] {
   font-size: 11px;
 }
 .cost-results strong {
-  font-family: "Barlow Condensed", sans-serif;
+  font-family: 'Barlow Condensed', sans-serif;
   font-size: 55px;
   font-weight: 500;
 }
@@ -2541,7 +2541,7 @@ input[type="checkbox"] {
   justify-content: center;
 }
 .error-number {
-  font-family: "Barlow Condensed", sans-serif;
+  font-family: 'Barlow Condensed', sans-serif;
   font-size: 250px;
   line-height: 1;
   display: block;
@@ -2613,7 +2613,7 @@ input[type="checkbox"] {
   position: relative;
 }
 .booking-progress:before {
-  content: "";
+  content: '';
   position: absolute;
   left: 15px;
   right: 15px;
@@ -2913,7 +2913,7 @@ input[type="checkbox"] {
   margin-top: 45px;
 }
 .mobile-drawer nav a {
-  font-family: "Barlow Condensed", sans-serif;
+  font-family: 'Barlow Condensed', sans-serif;
   font-size: 30px;
   line-height: 1.2;
   border-bottom: 1px solid var(--line);
@@ -3063,7 +3063,7 @@ input[type="checkbox"] {
   margin-top: 20px;
 }
 .venue-toast {
-  font-family: "DM Sans", sans-serif !important;
+  font-family: 'DM Sans', sans-serif !important;
   font-size: 12px !important;
 }
 .sr-only {
@@ -6109,17 +6109,25 @@ input[type="checkbox"] {
 
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
   .button:hover {
-    transform: translate3d(
-      var(--magnet-x, 0px),
-      calc(var(--magnet-y, 0px) - 2px),
-      0
-    );
+    transform: translate3d(var(--magnet-x, 0px), calc(var(--magnet-y, 0px) - 2px), 0);
   }
 }
 
 @media (max-width: 600px) {
- .hero { grid-template-columns: minmax(0, 1fr); }
- .hero-visual { min-width: 0; width: calc(100% - 24px); aspect-ratio: auto; }
- .footer-huge { font-size: 14vw; }
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hero-visual {
+    min-width: 0;
+    width: calc(100% - 24px);
+    aspect-ratio: auto;
+  }
+  .footer-huge {
+    font-size: 14vw;
+  }
 }
-@media (max-width:359px) { .phone-frame { right: 12px; } }
+@media (max-width: 359px) {
+  .phone-frame {
+    right: 12px;
+  }
+}

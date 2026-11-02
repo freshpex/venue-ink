@@ -1,8 +1,8 @@
-import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import {
   ArrowUpRight,
   Search,
@@ -11,28 +11,21 @@ import {
   ExternalLink,
   Mail,
   ArrowRight,
-} from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "../components/ui/button";
-import {
-  CTA,
-  FAQs,
-  Label,
-  PageIntro,
-  Photo,
-  Reveal,
-} from "../components/Primitives";
-import { articles, faqs, links } from "../data/site";
-import manifest from "../data/image-manifest.json";
-import { StudioDemo } from "../features/demo/StudioDemo";
-import { BookingWizard } from "../features/booking/BookingWizard";
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '../components/ui/button';
+import { CTA, FAQs, Label, PageIntro, Photo, Reveal } from '../components/Primitives';
+import { articles, faqs, links } from '../data/site';
+import manifest from '../data/image-manifest.json';
+import { StudioDemo } from '../features/demo/StudioDemo';
+import { BookingWizard } from '../features/booking/BookingWizard';
 export function Journal() {
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("All notes");
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('All notes');
   const filtered = articles.filter(
     (a) =>
-      (category === "All notes" || a.category === category) &&
-      (a.title + " " + a.originalTitle + " " + a.excerpt)
+      (category === 'All notes' || a.category === category) &&
+      (a.title + ' ' + a.originalTitle + ' ' + a.excerpt)
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
@@ -46,18 +39,16 @@ export function Journal() {
       <section className="container journal-page">
         <div className="gallery-controls">
           <div className="filter-list">
-            {["All notes", ...new Set(articles.map((a) => a.category))].map(
-              (c) => (
-                <button
-                  key={c}
-                  aria-pressed={category === c}
-                  className={category === c ? "active" : ""}
-                  onClick={() => setCategory(c)}
-                >
-                  {c}
-                </button>
-              ),
-            )}
+            {['All notes', ...new Set(articles.map((a) => a.category))].map((c) => (
+              <button
+                key={c}
+                aria-pressed={category === c}
+                className={category === c ? 'active' : ''}
+                onClick={() => setCategory(c)}
+              >
+                {c}
+              </button>
+            ))}
           </div>
           <label className="search-field">
             <Search size={18} />
@@ -99,8 +90,8 @@ export function Journal() {
             <h2>No notes found.</h2>
             <Button
               onClick={() => {
-                setSearch("");
-                setCategory("All notes");
+                setSearch('');
+                setCategory('All notes');
               }}
             >
               Show all notes
@@ -126,8 +117,7 @@ export function Article() {
         <h1>{article.originalTitle}</h1>
         <p>{article.excerpt}</p>
         <span className="article-source">
-          A reading note on the official Venue article. No invented author or
-          publication date.
+          A reading note on the official Venue article. No invented author or publication date.
         </span>
       </section>
       <div className="container article-hero">
@@ -138,9 +128,8 @@ export function Article() {
         <h2>{article.title}</h2>
         <p>{article.body}</p>
         <p>
-          This page is a short original overview. The complete article, its
-          author details and any current business terms remain on Venue’s
-          official journal.
+          This page is a short original overview. The complete article, its author details and any
+          current business terms remain on Venue’s official journal.
         </p>
         <Button asChild variant="dark">
           <a href={article.url}>
@@ -154,11 +143,9 @@ export function Article() {
             onClick={async () => {
               try {
                 await navigator.clipboard.writeText(article.url);
-                toast.success("Original article link copied");
+                toast.success('Original article link copied');
               } catch {
-                toast.error(
-                  "Could not copy. Open the original article to share its URL.",
-                );
+                toast.error('Could not copy. Open the original article to share its URL.');
               }
             }}
           >
@@ -188,9 +175,9 @@ export function Article() {
   );
 }
 export function Help() {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
   const filtered = faqs.filter((f) =>
-    (f.q + " " + f.a).toLowerCase().includes(search.toLowerCase()),
+    (f.q + ' ' + f.a).toLowerCase().includes(search.toLowerCase()),
   );
   return (
     <>
@@ -212,7 +199,7 @@ export function Help() {
         <FAQs items={filtered} />
         {!filtered.length && (
           <p>
-            No answers match that search. Try “payments”, “studio” or{" "}
+            No answers match that search. Try “payments”, “studio” or{' '}
             <Link to="/contact">contact the team</Link>.
           </p>
         )}
@@ -232,31 +219,22 @@ export function Help() {
   );
 }
 const contactSchema = z.object({
-  name: z.string().trim().min(2, "Please enter your name").max(100),
-  email: z.email("Please enter a valid email"),
-  type: z.enum([
-    "Artist support",
-    "Studio support",
-    "Pricing & plans",
-    "Something else",
-  ]),
+  name: z.string().trim().min(2, 'Please enter your name').max(100),
+  email: z.email('Please enter a valid email'),
+  type: z.enum(['Artist support', 'Studio support', 'Pricing & plans', 'Something else']),
   studio: z.string().max(150),
-  message: z
-    .string()
-    .trim()
-    .min(15, "Tell us a little more (at least 15 characters)")
-    .max(3000),
+  message: z.string().trim().min(15, 'Tell us a little more (at least 15 characters)').max(3000),
 });
 type ContactValues = z.infer<typeof contactSchema>;
 export function Contact() {
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState('');
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<ContactValues>({
     resolver: zodResolver(contactSchema),
-    defaultValues: { type: "Artist support", studio: "" },
+    defaultValues: { type: 'Artist support', studio: '' },
   });
   return (
     <>
@@ -274,36 +252,33 @@ export function Contact() {
             goes a long way.
           </h2>
           <p>
-            This form prepares an email in your own mail app. Your message is
-            sent only when you choose to send it there.
+            This form prepares an email in your own mail app. Your message is sent only when you
+            choose to send it there.
           </p>
           <a className="contact-email" href={`mailto:${links.contact}`}>
             {links.contact} <ArrowUpRight size={20} />
           </a>
           <p className="fine-print">
-            Support address verified in Venue’s official artist terms. This
-            preview has no email delivery provider configured.
+            Support address verified in Venue’s official artist terms. This preview has no email
+            delivery provider configured.
           </p>
-          <Photo
-            name="tools-workstation"
-            alt="Tattoo tools carefully arranged in a studio"
-          />
+          <Photo name="tools-workstation" alt="Tattoo tools carefully arranged in a studio" />
         </Reveal>
         <form
           className="contact-form"
           onSubmit={handleSubmit((v) => {
-            const body = `Name: ${v.name}\nReply email: ${v.email}\nStudio: ${v.studio || "Not specified"}\n\n${v.message}`;
+            const body = `Name: ${v.name}\nReply email: ${v.email}\nStudio: ${v.studio || 'Not specified'}\n\n${v.message}`;
             setDraft(
-              `mailto:${links.contact}?subject=${encodeURIComponent(v.type + " enquiry")}&body=${encodeURIComponent(body)}`,
+              `mailto:${links.contact}?subject=${encodeURIComponent(v.type + ' enquiry')}&body=${encodeURIComponent(body)}`,
             );
-            toast("Email draft prepared. Open your mail app to send it.");
+            toast('Email draft prepared. Open your mail app to send it.');
           })}
         >
           <div className="form-grid">
             <label>
               Your name
               <input
-                {...register("name")}
+                {...register('name')}
                 autoComplete="name"
                 aria-invalid={!!errors.name}
                 aria-describedby="contact-name-error"
@@ -317,7 +292,7 @@ export function Contact() {
             <label>
               Email address
               <input
-                {...register("email")}
+                {...register('email')}
                 type="email"
                 autoComplete="email"
                 aria-invalid={!!errors.email}
@@ -332,25 +307,22 @@ export function Contact() {
           </div>
           <label>
             What’s it about?
-            <select {...register("type")}>
-              {[
-                "Artist support",
-                "Studio support",
-                "Pricing & plans",
-                "Something else",
-              ].map((t) => (
-                <option key={t}>{t}</option>
-              ))}
+            <select {...register('type')}>
+              {['Artist support', 'Studio support', 'Pricing & plans', 'Something else'].map(
+                (t) => (
+                  <option key={t}>{t}</option>
+                ),
+              )}
             </select>
           </label>
           <label>
             Studio or artist name <small>(optional)</small>
-            <input {...register("studio")} autoComplete="organization" />
+            <input {...register('studio')} autoComplete="organization" />
           </label>
           <label>
             A little about your question
             <textarea
-              {...register("message")}
+              {...register('message')}
               rows={6}
               aria-invalid={!!errors.message}
               aria-describedby="contact-message-error"
@@ -363,8 +335,7 @@ export function Contact() {
             )}
           </label>
           <p className="fine-print">
-            Please don’t include payment details, private client records or
-            medical information.
+            Please don’t include payment details, private client records or medical information.
           </p>
           <Button type="submit" variant="dark">
             Prepare my email <ArrowUpRight size={18} />
@@ -396,26 +367,25 @@ export function GetStarted() {
       <section className="container onboarding-grid">
         {[
           {
-            title: "I’m an artist.",
-            description: "Give your books a home and your work some headspace.",
-            photo: "artist-portrait-man",
+            title: 'I’m an artist.',
+            description: 'Give your books a home and your work some headspace.',
+            photo: 'artist-portrait-man',
             url: links.signup,
-            cta: "Set up with Venue",
+            cta: 'Set up with Venue',
           },
           {
-            title: "I run a studio.",
-            description: "Bring your people, calendars and requests together.",
-            photo: "studio-interior",
+            title: 'I run a studio.',
+            description: 'Bring your people, calendars and requests together.',
+            photo: 'studio-interior',
             url: links.signup,
-            cta: "Start a studio account",
+            cta: 'Start a studio account',
           },
           {
-            title: "I’m just exploring.",
-            description:
-              "Try the calendar and booking example. No account needed.",
-            photo: "studio-community",
-            url: "/demo",
-            cta: "Take a look around",
+            title: 'I’m just exploring.',
+            description: 'Try the calendar and booking example. No account needed.',
+            photo: 'studio-community',
+            url: '/demo',
+            cta: 'Take a look around',
           },
         ].map((item, i) => (
           <Reveal className="onboarding-card" delay={i * 0.1} key={item.title}>
@@ -424,7 +394,7 @@ export function GetStarted() {
               <h2>{item.title}</h2>
               <p>{item.description}</p>
               <Button asChild variant="dark">
-                {item.url.startsWith("/") ? (
+                {item.url.startsWith('/') ? (
                   <Link to={item.url}>
                     {item.cta}
                     <ArrowUpRight size={17} />
@@ -441,8 +411,8 @@ export function GetStarted() {
         ))}
       </section>
       <p className="container fine-print onboarding-note">
-        Real accounts open the official Venue sign-up. This independent redesign
-        does not connect to existing Venue credentials.
+        Real accounts open the official Venue sign-up. This independent redesign does not connect to
+        existing Venue credentials.
       </p>
       <CTA title="A little less waiting. A lot more creating." />
     </>
@@ -460,8 +430,8 @@ export function Demo() {
       <section className="container full-demo">
         <div className="demo-page-controls">
           <p>
-            Illustrative artists and requests. No messages, appointments or
-            payments leave this demo.
+            Illustrative artists and requests. No messages, appointments or payments leave this
+            demo.
           </p>
           <Button variant="dark" onClick={() => setBooking(true)}>
             Create an example booking <ArrowUpRight size={17} />
@@ -492,7 +462,7 @@ export function Credits() {
       <section className="container credits-grid">
         {manifest.map((item) => (
           <article key={item.id}>
-            <Photo name={item.filename.replace(".webp", "")} alt={item.alt} />
+            <Photo name={item.filename.replace('.webp', '')} alt={item.alt} />
             <h2>{item.photographer}</h2>
             <p>{item.alt}</p>
             <div>
@@ -521,9 +491,7 @@ export function NotFound() {
         <br />
         Let’s get you back.
       </h1>
-      <p>
-        The page you’re looking for isn’t here. Your next good idea might be.
-      </p>
+      <p>The page you’re looking for isn’t here. Your next good idea might be.</p>
       <Button asChild variant="dark">
         <Link to="/">
           Back to Venue <ArrowUpRight size={19} />

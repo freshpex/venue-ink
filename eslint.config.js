@@ -1,30 +1,25 @@
-import js from "@eslint/js";
-import tseslint from "typescript-eslint";
-import hooks from "eslint-plugin-react-hooks";
-import globals from "globals";
+import js from '@eslint/js';
+import tseslint from 'typescript-eslint';
+import hooks from 'eslint-plugin-react-hooks';
+import globals from 'globals';
 export default tseslint.config(
   {
-    ignores: [
-      "dist/**",
-      "node_modules/**",
-      "playwright-report/**",
-      "test-results/**",
-    ],
+    ignores: ['dist/**', 'node_modules/**', 'playwright-report/**', 'test-results/**'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ["src/**/*.{ts,tsx}"],
+    files: ['src/**/*.{ts,tsx}'],
     languageOptions: { globals: globals.browser },
-    plugins: { "react-hooks": hooks },
+    plugins: { 'react-hooks': hooks },
     rules: {
       ...hooks.configs.recommended.rules,
-      "react-hooks/set-state-in-effect": "off",
-      "react-hooks/refs": "off",
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/refs': 'off',
     },
   },
   {
-    files: ["**/*.{js,mjs}", "tests/**/*.ts", "vite.config.ts"],
+    files: ['**/*.{js,mjs}', 'tests/**/*.ts', 'vite.config.ts'],
     languageOptions: { globals: globals.node },
   },
 );

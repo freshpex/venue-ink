@@ -1,15 +1,10 @@
-import { useEffect, useState } from "react";
-import { Link, NavLink, useLocation } from "react-router-dom";
-import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowUpRight, ChevronDown, Menu, X, Instagram } from "lucide-react";
-import {
-  AnimatePresence,
-  motion,
-  useScroll,
-  useReducedMotion,
-} from "motion/react";
-import { Button } from "./ui/button";
-import { links, navFeatures } from "../data/site";
+import { useEffect, useState } from 'react';
+import { Link, NavLink, useLocation } from 'react-router-dom';
+import * as Dialog from '@radix-ui/react-dialog';
+import { ArrowUpRight, ChevronDown, Menu, X, Instagram } from 'lucide-react';
+import { AnimatePresence, motion, useScroll, useReducedMotion } from 'motion/react';
+import { Button } from './ui/button';
+import { links, navFeatures } from '../data/site';
 export function Logo() {
   return (
     <span className="wordmark">
@@ -26,17 +21,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setMenu(false);
     setFeatures(false);
-    window.scrollTo({ top: 0, behavior: "instant" });
+    window.scrollTo({ top: 0, behavior: 'instant' });
   }, [location.pathname]);
   return (
     <>
       <a href="#main" className="skip-link">
         Skip to content
       </a>
-      <motion.div
-        className="scroll-progress"
-        style={{ scaleX: scrollYProgress }}
-      />
+      <motion.div className="scroll-progress" style={{ scaleX: scrollYProgress }} />
       <header className="site-header">
         <Link aria-label="Venue home" to="/">
           <Logo />
@@ -47,11 +39,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
             onMouseEnter={() => setFeatures(true)}
             onMouseLeave={() => setFeatures(false)}
             onBlur={(e) => {
-              if (!e.currentTarget.contains(e.relatedTarget as Node))
-                setFeatures(false);
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) setFeatures(false);
             }}
             onKeyDown={(e) => {
-              if (e.key === "Escape") setFeatures(false);
+              if (e.key === 'Escape') setFeatures(false);
             }}
           >
             <button
@@ -98,10 +89,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </Link>
           </Button>
           <Dialog.Root open={menu} onOpenChange={setMenu}>
-            <Dialog.Trigger
-              className="mobile-menu-trigger"
-              aria-label="Open navigation"
-            >
+            <Dialog.Trigger className="mobile-menu-trigger" aria-label="Open navigation">
               <Menu />
             </Dialog.Trigger>
             <Dialog.Portal>
@@ -113,21 +101,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <Dialog.Description className="sr-only">
                   Explore Venue’s booking tools and resources.
                 </Dialog.Description>
-                <Dialog.Close
-                  className="icon-button drawer-close"
-                  aria-label="Close navigation"
-                >
+                <Dialog.Close className="icon-button drawer-close" aria-label="Close navigation">
                   <X />
                 </Dialog.Close>
                 <nav aria-label="Mobile navigation">
                   {[
-                    { path: "/", label: "Home" },
-                    { path: "/for-tattoo-artists", label: "For artists" },
-                    { path: "/studios", label: "For studios" },
+                    { path: '/', label: 'Home' },
+                    { path: '/for-tattoo-artists', label: 'For artists' },
+                    { path: '/studios', label: 'For studios' },
                     ...navFeatures,
-                    { path: "/pricing", label: "Pricing" },
-                    { path: "/journal", label: "Journal" },
-                    { path: "/contact", label: "Talk to us" },
+                    { path: '/pricing', label: 'Pricing' },
+                    { path: '/journal', label: 'Journal' },
+                    { path: '/contact', label: 'Talk to us' },
                   ].map((n, i) => (
                     <motion.div
                       initial={reduced ? false : { x: 25, opacity: 0 }}
@@ -164,14 +149,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <br />
               And the people behind it.
             </p>
-            <a
-              className="social-link"
-              href={links.instagram}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <Instagram size={18} /> Follow the culture{" "}
-              <ArrowUpRight size={14} />
+            <a className="social-link" href={links.instagram} target="_blank" rel="noreferrer">
+              <Instagram size={18} /> Follow the culture <ArrowUpRight size={14} />
             </a>
           </div>
           <div>
