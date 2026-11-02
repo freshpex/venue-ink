@@ -14,7 +14,7 @@ import { publicRoutes } from './routes/public.mjs';
 import { bookingRoutes } from './routes/bookings.mjs';
 import { workspaceRoutes } from './routes/workspace.mjs';
 import { adminRoutes } from './routes/admin.mjs';
-export function createApp({ pool, secret, origins, production = false, limit = 20 }) {
+export function createApp({ pool, secret, origins, production = false,securityHeaders=production, limit = 20 }) {
   if (!secret || secret.length < 32)
     throw new Error('JWT_SECRET must contain at least 32 characters');
   const app = express();
@@ -22,15 +22,31 @@ export function createApp({ pool, secret, origins, production = false, limit = 2
   app.set('trust proxy', 1);
   app.use(
     helmet({
-      contentSecurityPolicy: production
+      contentSecurityPolicy: securityHeaders
         ? {
             directives: {
               defaultSrc: ["'self'"],
-              scriptSrc: ["'self'"],
-              styleSrc: ["'self'", "'unsafe-inline'"],
-              imgSrc: ["'self'", 'data:', 'blob:'],
-              connectSrc: ["'self'", ...origins],
-              fontSrc: ["'self'"],
+              scriptSrc: ["'self'", 'https://*.tawk.to', 'https://cdn.jsdelivr.net'],
+              styleSrc: [
+                "'self'",
+                "'unsafe-inline'",
+                'https://*.tawk.to',
+                'https://fonts.googleapis.com',
+                'https://cdn.jsdelivr.net',
+              ],
+              imgSrc: [
+                "'self'",
+                'data:',
+                'blob:',
+                'https://*.tawk.to',
+                'https://cdn.jsdelivr.net',
+                'https://tawk.link',
+                'https://s3.amazonaws.com',
+              ],
+              connectSrc: ["'self'", ...origins, 'https://*.tawk.to', 'wss://*.tawk.to'],
+              fontSrc: ["'self'", 'https://*.tawk.to', 'https://fonts.gstatic.com'],
+              frameSrc: ["'self'", 'https://*.tawk.to'],
+              formAction: ["'self'", 'https://*.tawk.to'],
               objectSrc: ["'none'"],
               frameAncestors: ["'none'"],
               upgradeInsecureRequests: [],

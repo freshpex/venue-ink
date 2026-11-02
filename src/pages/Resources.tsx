@@ -237,7 +237,7 @@ export function Contact() {
             </label>
             <label>
               What’s on your mind?
-              <select name="category">
+              <select name="category" aria-label="What’s on your mind?">
                 <option>General enquiry</option>
                 <option>Account support</option>
                 <option>Studio setup</option>
@@ -386,6 +386,7 @@ export function Legal() {
               dispute or payment may need to be retained.
             </p>
             <h2>Email enquiries</h2>
+            <p>The optional live support widget is provided by Tawk.to. It may process your IP address, browser information, page visits and messages, and use cookies to maintain a support conversation. Share only the details needed for your enquiry. You can also contact Venue through the platform’s support form.</p>
             <p>
               Opening an email payment enquiry passes the message to your chosen mail application
               and email provider. Do not include payment credentials or sensitive financial details

@@ -214,7 +214,7 @@ function PaymentsPanel({ staff }: { staff: boolean }) {
                     value: payment.amount_cents === null ? '' : payment.amount_cents / 100,
                     min: 0.01,
                     step: '0.01',
-                    required: true,
+                    hint: 'Required when recording received funds. Leave empty to cancel an unquoted enquiry.',
                   },
                   { name: 'receipt', label: 'Receipt or transaction reference', required: true },
                 ]}
@@ -224,7 +224,9 @@ function PaymentsPanel({ staff }: { staff: boolean }) {
                     method: 'PATCH',
                     body: JSON.stringify({
                       status: str(data, 'status'),
-                      amountCents: cents(data, 'amount'),
+                      ...(cents(data, 'amount') === null
+                        ? {}
+                        : { amountCents: cents(data, 'amount') }),
                       receiptReference: str(data, 'receipt'),
                     }),
                   })

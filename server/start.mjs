@@ -43,7 +43,7 @@ if (!ready) {
   process.exit(1);
 }
 const pool = createPool();
-const app = createApp({ pool, secret: process.env.JWT_SECRET, origins, production });
+const app = createApp({ pool, secret: process.env.JWT_SECRET, origins, production,securityHeaders:production||process.env.SECURITY_HEADERS==='true' });
 const publicDirectory = fileURLToPath(new URL('../public', import.meta.url));
 const dist = fileURLToPath(new URL('../dist', import.meta.url));
 if ((production || process.env.SERVE_DIST === 'true') && existsSync(`${dist}/index.html`)) {

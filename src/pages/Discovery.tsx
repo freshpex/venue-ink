@@ -311,7 +311,7 @@ export function Events() {
         eventId={event?.id}
         artistId={event?.artist_id}
         serviceId={event?.service_id}
-        initialDate={event ? new Date(event.starts_at).toLocaleDateString('en-CA') : undefined}
+        initialDate={event ? new Intl.DateTimeFormat('en-CA',{timeZone:event.timezone||'UTC',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(event.starts_at)) : undefined}
       />
       <CTA />
     </>

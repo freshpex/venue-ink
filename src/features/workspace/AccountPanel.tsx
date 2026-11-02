@@ -50,8 +50,8 @@ export function AccountPanel() {
             await request('/auth/password', {
               method: 'PATCH',
               body: JSON.stringify({
-                currentPassword: str(data, 'current'),
-                newPassword: str(data, 'next'),
+                currentPassword: String(data.get('current') || ''),
+                newPassword: String(data.get('next') || ''),
               }),
             });
           }}

@@ -7,6 +7,7 @@ export const bookingJoins =
   'FROM venue_app.bookings b JOIN venue_app.services s ON s.id=b.service_id JOIN venue_app.artist_profiles a ON a.user_id=b.artist_id LEFT JOIN venue_app.studios st ON st.id=a.studio_id JOIN venue_app.users u ON u.id=b.client_id';
 export function bookingScope(user, start = 1) {
   if (user.role === 'admin') return { clause: 'true', params: [] };
+  if (user.role === 'client') return { clause: `b.client_id=$${start}`, params: [user.id] };
   return {
     clause: `(b.client_id=$${start} OR b.artist_id=$${start} OR st.owner_id=$${start})`,
     params: [user.id],
@@ -64,11 +65,11 @@ export async function getSlots(db, { artistId, serviceId, date, eventId }) {
     throw new HttpError(400, 'Choose a valid date.');
   const profile = (
     await db.query(
-      'SELECT a.user_id,a.studio_id,a.published,a.books_open,st.timezone FROM venue_app.artist_profiles a LEFT JOIN venue_app.studios st ON st.id=a.studio_id JOIN venue_app.users u ON u.id=a.user_id AND u.active=true WHERE a.user_id=$1',
+      'SELECT a.user_id,a.studio_id,a.published,a.books_open,st.timezone,st.published AS studio_published FROM venue_app.artist_profiles a LEFT JOIN venue_app.studios st ON st.id=a.studio_id JOIN venue_app.users u ON u.id=a.user_id AND u.active=true WHERE a.user_id=$1',
       [artistId],
     )
   ).rows[0];
-  if (!profile || !profile.published || !profile.books_open)
+  if (!profile || !profile.published || !profile.books_open || !profile.studio_published)
     return { slots: [], timezone: profile?.timezone || 'UTC' };
   const service = (
     await db.query(

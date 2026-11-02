@@ -22,14 +22,6 @@ For a production build, run `npm run build`. Set `NODE_ENV=production`, `CLIENT_
 
 Uploaded images are compressed in the browser and stored durably in PostgreSQL (2 MB per image, 40 MB per user). Reference images are private; publishing a profile photograph or flash image makes that image public. The application does not use ephemeral Render disk for uploads.
 
-## Render
-
-Connect this folder's repository to Render using `render.yaml`. The blueprint defines one free Node web service for the frontend and API, avoiding cross-site cookie restrictions. Set `DATABASE_URL`, `CLIENT_ORIGINS`, `SITE_URL`, `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` in Render. Use the assigned Render HTTPS URL for both origin variables. `VITE_API_URL` stays empty for this same-origin setup. The blueprint generates a JWT secret. Change the initial admin password from the account screen after first sign-in.
-
-Startup applies tracked migrations using a direct Neon connection and an advisory lock, retries transient failures, then serves readiness at `/api/health`. Login retains entered details, displays connection progress and waits up to 150 seconds while a free Render service starts. It supports cancellation and retry. Database health remains independent of browser rendering.
-
-The repository includes deployment configuration. A hosted deployment still requires the owner's Render account and environment configuration.
-
 ## Verification
 
-Run `npm run format`, `npm run format:check`, `npm run lint`, `npm test`, `npm run build` and `npm run test:e2e`. API integration tests use temporary accounts and records in the configured application schema and remove only their own records. They do not reset the database. Chromium, Firefox and WebKit browser projects cover public routes, mobile layouts, authentication and real booking/payment flows. Actual results are recorded in `docs/IMPLEMENTATION_STATUS.md`.
+Run `npm run format`, `npm run format:check`, `npm run lint`, `npm test`, `npm run build` and `npm run test:e2e`. API integration tests use temporary accounts and records in the configured application schema and remove only their own records.

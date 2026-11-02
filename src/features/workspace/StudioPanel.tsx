@@ -111,10 +111,10 @@ export function StudioPanel() {
                 <>
                   {artistsQuery.isPending || servicesQuery.isPending ? (
                     <Loading />
-                  ) : artistsQuery.isError ? (
+                  ) : artistsQuery.isError || servicesQuery.isError ? (
                     <Failure
-                      message={artistsQuery.error.message}
-                      retry={() => artistsQuery.refetch()}
+                      message={(artistsQuery.error||servicesQuery.error)?.message||'The service menu could not load.'}
+                      retry={() => {void artistsQuery.refetch();void servicesQuery.refetch();}}
                     />
                   ) : (
                     <>
@@ -257,7 +257,7 @@ export function StudioPanel() {
               ) : tab === 'Artwork' ? (
                 flashQuery.isPending ? (
                   <Loading />
-                ) : flashQuery.data?.designs.length ? (
+                ) : flashQuery.isError ? <Failure message={flashQuery.error.message} retry={()=>flashQuery.refetch()}/> : flashQuery.data?.designs.length ? (
                   <div className="workspace-flash-grid">
                     {flashQuery.data.designs.slice(0, 3).map((item) => (
                       <Link key={item.id} to="/flash">

@@ -8,6 +8,7 @@ test('capture every major layout for desktop and mobile visual inspection', asyn
     'Visual assets are captured once; functional journeys run on every engine.',
   );
   mkdirSync('artifacts/qa', { recursive: true });
+  await page.route('https://embed.tawk.to/**', (route) => route.abort());
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: width === 1440 ? 1000 : 844 });
     for (const route of [

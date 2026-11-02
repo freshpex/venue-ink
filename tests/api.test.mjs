@@ -25,14 +25,12 @@ it('rejects unauthorized records, origins and role escalation', async () => {
   expect((await supertest(f.app).post('/api/auth/register').send({})).status).toBe(403);
   expect(
     (
-      await f
-        .mutation(f.client.agent.post('/api/auth/register'))
-        .send({
-          name: 'Escalation',
-          email: 'escalation@venue.test',
-          password: 'LongPassword42!',
-          role: 'admin',
-        })
+      await f.mutation(f.client.agent.post('/api/auth/register')).send({
+        name: 'Escalation',
+        email: 'escalation@venue.test',
+        password: 'LongPassword42!',
+        role: 'admin',
+      })
     ).status,
   ).toBe(400);
   expect((await f.client.agent.get('/api/admin/users')).status).toBe(403);
@@ -64,13 +62,11 @@ it('validates real calendar dates', async () => {
   ).toBe(400);
 });
 it('stores reference images privately and checks ownership', async () => {
-  const result = await f
-    .mutation(f.client.agent.post('/api/assets'))
-    .send({
-      filename: 'reference.png',
-      mimeType: 'image/png',
-      data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0WQAAAAASUVORK5CYII=',
-    });
+  const result = await f.mutation(f.client.agent.post('/api/assets')).send({
+    filename: 'reference.png',
+    mimeType: 'image/png',
+    data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0WQAAAAASUVORK5CYII=',
+  });
   expect(result.status).toBe(201);
   asset = result.body.asset;
   expect((await supertest(f.app).get('/api/assets/' + asset.id)).status).toBe(404);
@@ -199,14 +195,12 @@ it('does not let the client mark a payment received or inject an amount', async 
   ).toBe(404);
   expect(
     (
-      await f
-        .mutation(f.client.agent.post('/api/checkout'))
-        .send({
-          bookingId: booking.id,
-          method: 'PayPal',
-          amountCents: 1,
-          idempotencyKey: randomUUID(),
-        })
+      await f.mutation(f.client.agent.post('/api/checkout')).send({
+        bookingId: booking.id,
+        method: 'PayPal',
+        amountCents: 1,
+        idempotencyKey: randomUUID(),
+      })
     ).status,
   ).toBe(400);
 });
@@ -244,14 +238,12 @@ it('records verified receipt once and prevents overpayment', async () => {
   ).toBe(409);
 });
 it('stores support requests and returns administrator replies', async () => {
-  const result = await f
-    .mutation(f.client.agent.post('/api/contact'))
-    .send({
-      name: 'QA Client',
-      email: f.client.email,
-      category: 'Account support',
-      message: 'Please help me with my account settings.',
-    });
+  const result = await f.mutation(f.client.agent.post('/api/contact')).send({
+    name: 'QA Client',
+    email: f.client.email,
+    category: 'Account support',
+    message: 'Please help me with my account settings.',
+  });
   expect(result.status).toBe(201);
   f.supportRefs.push(result.body.request.reference);
   expect(
@@ -264,13 +256,11 @@ it('stores support requests and returns administrator replies', async () => {
   expect((await f.client.agent.get('/api/support')).body.requests[0].reply).toContain('My account');
 });
 it('publishes owned artwork and persists saved designs', async () => {
-  const uploaded = await f
-    .mutation(f.artist.agent.post('/api/assets'))
-    .send({
-      filename: 'artwork.png',
-      mimeType: 'image/png',
-      data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0WQAAAAASUVORK5CYII=',
-    });
+  const uploaded = await f.mutation(f.artist.agent.post('/api/assets')).send({
+    filename: 'artwork.png',
+    mimeType: 'image/png',
+    data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0WQAAAAASUVORK5CYII=',
+  });
   expect(uploaded.status).toBe(201);
   const payload = {
     artistId: f.artist.user.id,
@@ -312,20 +302,18 @@ it('publishes owned artwork and persists saved designs', async () => {
   ).toBe(false);
 });
 it('publishes events and constrains availability to the event window', async () => {
-  const event = await f
-    .mutation(f.artist.agent.post('/api/workspace/events'))
-    .send({
-      studioId: f.studio.id,
-      artistId: f.artist.user.id,
-      serviceId: f.service.id,
-      title: 'Studio gathering',
-      description: 'A day for original work',
-      location: 'Studio',
-      startsAt: f.slots[4].startsAt,
-      endsAt: f.slots[7].endsAt,
-      capacity: 1,
-      published: true,
-    });
+  const event = await f.mutation(f.artist.agent.post('/api/workspace/events')).send({
+    studioId: f.studio.id,
+    artistId: f.artist.user.id,
+    serviceId: f.service.id,
+    title: 'Studio gathering',
+    description: 'A day for original work',
+    location: 'Studio',
+    startsAt: f.slots[4].startsAt,
+    endsAt: f.slots[7].endsAt,
+    capacity: 1,
+    published: true,
+  });
   expect(event.status).toBe(201);
   expect(
     (await supertest(f.app).get('/api/events')).body.events.some(
@@ -354,29 +342,25 @@ it('creates and accepts email-bound studio invitations', async () => {
     .send({ studioId: f.studio.id, email });
   expect(invite.status).toBe(201);
   const agent = supertest.agent(f.app);
-  const result = await f
-    .mutation(agent.post('/api/auth/register'))
-    .send({
-      name: 'Invited Artist',
-      email,
-      password: 'IntegrationPassword42!',
-      role: 'artist',
-      invitation: invite.body.token,
-    });
+  const result = await f.mutation(agent.post('/api/auth/register')).send({
+    name: 'Invited Artist',
+    email,
+    password: 'IntegrationPassword42!',
+    role: 'artist',
+    invitation: invite.body.token,
+  });
   expect(result.status).toBe(201);
   f.users.push(result.body.user.id);
   expect((await agent.get('/api/profile')).body.profile.studio_id).toBe(f.studio.id);
   expect(
     (
-      await f
-        .mutation(agent.post('/api/auth/register'))
-        .send({
-          name: 'Another artist',
-          email: 'another-' + email,
-          password: 'IntegrationPassword42!',
-          role: 'artist',
-          invitation: invite.body.token,
-        })
+      await f.mutation(agent.post('/api/auth/register')).send({
+        name: 'Another artist',
+        email: 'another-' + email,
+        password: 'IntegrationPassword42!',
+        role: 'artist',
+        invitation: invite.body.token,
+      })
     ).status,
   ).toBe(400);
 });
@@ -403,3 +387,4 @@ it('revokes the session after logout', async () => {
   expect((await f.mutation(f.outsider.agent.post('/api/auth/logout')).send({})).status).toBe(200);
   expect((await f.outsider.agent.get('/api/auth/me')).status).toBe(401);
 });
+it('removes staff record access when an artist is demoted',async()=>{expect((await f.mutation(f.admin.patch('/api/admin/users/'+f.artist.user.id)).send({role:'client'})).status).toBe(200);expect((await f.artist.agent.get('/api/auth/me')).status).toBe(401);expect((await f.mutation(f.artist.agent.post('/api/auth/login')).send({email:f.artist.email,password:f.artist.password})).status).toBe(200);expect((await f.artist.agent.get('/api/bookings')).body.bookings).toEqual([]);expect((await f.artist.agent.get('/api/bookings/'+booking.id)).status).toBe(404);expect((await f.artist.agent.get('/api/assets/'+asset.id)).status).toBe(404);expect((await f.artist.agent.get('/api/payments')).body.payments).toEqual([]);expect((await supertest(f.app).get('/api/artists')).body.artists.some(a=>a.id===f.artist.user.id)).toBe(false);});

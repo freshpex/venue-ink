@@ -58,7 +58,10 @@ export function BookingWizard({
   const [artistChoice, setArtistChoice] = useState('');
   const [serviceChoice, setServiceChoice] = useState('');
   const [day, setDay] = useState(() => new Date(Date.now() + 86400000).toLocaleDateString('en-CA'));
-  const [dateBounds]=useState(()=>({min:new Date().toLocaleDateString('en-CA'),max:new Date(Date.now()+365*86400000).toLocaleDateString('en-CA')}));
+  const [dateBounds] = useState(() => ({
+    min: new Date().toLocaleDateString('en-CA'),
+    max: new Date(Date.now() + 365 * 86400000).toLocaleDateString('en-CA'),
+  }));
   const [time, setTime] = useState('');
   const [files, setFiles] = useState<{ file: File; url: string }[]>([]);
   const urls = useRef<string[]>([]);
@@ -73,10 +76,11 @@ export function BookingWizard({
   );
   const abort = useRef<AbortController | null>(null);
   const submission = useRef<{ key: string; fingerprint: string } | null>(null);
-  const artists = artistsQuery.data?.artists || [];
-  const selectedArtist = artists.find((a) => a.id === (artistChoice || artistId)) || artists[0];
+  const artists = (artistsQuery.data?.artists || []).filter(artist=>!(flashId||eventId)||!artistId||artist.id===artistId);
+  const preferredStudio=servicesQuery.data?.services.find(service=>service.id===serviceId)?.studio_id;
+  const selectedArtist = artists.find((a) => a.id === (artistChoice || artistId)) || (!artistChoice&&!artistId?artists.find(artist=>artist.studio_id===preferredStudio):undefined) || artists[0];
   const services = (servicesQuery.data?.services || []).filter(
-    (s) => s.studio_id === selectedArtist?.studio_id,
+    (s) => s.studio_id === selectedArtist?.studio_id && (!eventId||!serviceId||s.id===serviceId),
   );
   const selectedService =
     services.find((s) => s.id === (serviceChoice || serviceId)) || services[0];
@@ -242,7 +246,7 @@ export function BookingWizard({
         controller.signal,
       );
       setDone(response.booking);
-      await refresh();
+      void refresh();
       toast.success('Your booking request has been received');
     } catch (error) {
       if (!controller.signal.aborted) setError((error as Error).message);
@@ -338,10 +342,10 @@ export function BookingWizard({
                       <>
                         {artistsQuery.isPending || servicesQuery.isPending ? (
                           <Loading />
-                        ) : artistsQuery.isError ? (
+                        ) : artistsQuery.isError || servicesQuery.isError ? (
                           <Failure
-                            message={artistsQuery.error.message}
-                            retry={() => artistsQuery.refetch()}
+                            message={(artistsQuery.error||servicesQuery.error)?.message||'The service menu could not load.'}
+                            retry={() => {void artistsQuery.refetch();void servicesQuery.refetch();}}
                           />
                         ) : (
                           <>
@@ -369,6 +373,7 @@ export function BookingWizard({
                             <label>
                               Service
                               <select
+                                aria-label="Service"
                                 value={selectedService?.id || ''}
                                 onChange={(event) => {
                                   setServiceChoice(event.target.value);
@@ -412,7 +417,7 @@ export function BookingWizard({
                         <div className="form-grid">
                           <label>
                             Placement
-                            <select {...register('placement')}>
+                            <select aria-label="Placement" {...register('placement')}>
                               {[
                                 'Forearm',
                                 'Upper arm',
@@ -426,7 +431,7 @@ export function BookingWizard({
                           </label>
                           <label>
                             Approximate size
-                            <select {...register('size')}>
+                            <select aria-label="Approximate size" {...register('size')}>
                               {[
                                 'Discuss with artist',
                                 'Small · under 10 cm',

@@ -16,7 +16,7 @@ export function publicRoutes(app, { pool, writeLimiter }) {
   app.get('/api/artists', async (_req, res) => {
     const artists = (
       await pool.query(
-        'SELECT a.user_id AS id,a.slug,a.display_name,a.bio,a.styles,a.theme,a.image_url,a.books_open,a.studio_id,st.name AS studio_name,st.timezone FROM venue_app.artist_profiles a JOIN venue_app.users u ON u.id=a.user_id AND u.active=true LEFT JOIN venue_app.studios st ON st.id=a.studio_id WHERE a.published=true ORDER BY a.created_at LIMIT 100',
+        'SELECT a.user_id AS id,a.slug,a.display_name,a.bio,a.styles,a.theme,a.image_url,a.books_open,a.studio_id,st.name AS studio_name,st.timezone FROM venue_app.artist_profiles a JOIN venue_app.users u ON u.id=a.user_id AND u.active=true LEFT JOIN venue_app.studios st ON st.id=a.studio_id WHERE a.published=true AND st.published=true ORDER BY a.created_at LIMIT 100',
       )
     ).rows;
     res.json({ artists });
@@ -24,7 +24,7 @@ export function publicRoutes(app, { pool, writeLimiter }) {
   app.get('/api/artists/:slug', async (req, res) => {
     const artist = (
       await pool.query(
-        'SELECT a.user_id AS id,a.slug,a.display_name,a.bio,a.styles,a.theme,a.image_url,a.books_open,a.studio_id,st.name AS studio_name,st.timezone FROM venue_app.artist_profiles a JOIN venue_app.users u ON u.id=a.user_id AND u.active=true LEFT JOIN venue_app.studios st ON st.id=a.studio_id WHERE a.slug=$1 AND a.published=true',
+        'SELECT a.user_id AS id,a.slug,a.display_name,a.bio,a.styles,a.theme,a.image_url,a.books_open,a.studio_id,st.name AS studio_name,st.timezone FROM venue_app.artist_profiles a JOIN venue_app.users u ON u.id=a.user_id AND u.active=true LEFT JOIN venue_app.studios st ON st.id=a.studio_id WHERE a.slug=$1 AND a.published=true AND st.published=true',
         [req.params.slug],
       )
     ).rows[0];
@@ -87,7 +87,8 @@ export function publicRoutes(app, { pool, writeLimiter }) {
   });
   app.get('/api/flash', async (req, res) => {
     const params = [];
-    let where = 'f.published=true AND f.archived=false AND a.published=true AND u.active=true';
+    let where =
+      'f.published=true AND f.archived=false AND a.published=true AND st.published=true AND u.active=true';
     if (req.query.artistId) {
       params.push(parse(id, req.query.artistId));
       where += ` AND f.artist_id=$${params.length}`;
@@ -143,8 +144,8 @@ export function publicRoutes(app, { pool, writeLimiter }) {
         permitted =
           (
             await pool.query(
-              'SELECT 1 FROM venue_app.booking_assets ba JOIN venue_app.bookings b ON b.id=ba.booking_id JOIN venue_app.artist_profiles a ON a.user_id=b.artist_id LEFT JOIN venue_app.studios st ON st.id=a.studio_id WHERE ba.asset_id=$1 AND (b.client_id=$2 OR b.artist_id=$2 OR st.owner_id=$2)',
-              [assetId, req.user.id],
+              'SELECT 1 FROM venue_app.booking_assets ba JOIN venue_app.bookings b ON b.id=ba.booking_id JOIN venue_app.artist_profiles a ON a.user_id=b.artist_id LEFT JOIN venue_app.studios st ON st.id=a.studio_id WHERE ba.asset_id=$1 AND (b.client_id=$2 OR ($3=true AND (b.artist_id=$2 OR st.owner_id=$2)))',
+              [assetId, req.user.id, req.user.role !== 'client'],
             )
           ).rowCount > 0;
       }
@@ -153,7 +154,7 @@ export function publicRoutes(app, { pool, writeLimiter }) {
     const bytes = (await pool.query('SELECT data FROM venue_app.assets WHERE id=$1', [assetId]))
       .rows[0].data;
     res.set('Content-Type', asset.mime_type);
-    if (asset.public) res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
     res.set('Cache-Control', asset.public ? 'public,max-age=3600' : 'private,no-store');
     res.set('X-Content-Type-Options', 'nosniff');
     res.send(bytes);
@@ -195,4 +196,3 @@ export function publicRoutes(app, { pool, writeLimiter }) {
     res.status(201).json({ request: record });
   });
 }
-

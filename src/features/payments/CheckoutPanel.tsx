@@ -47,7 +47,7 @@ export function CheckoutPanel({ bookingId }: { bookingId: string }) {
               body: JSON.stringify({ bookingId, method, purpose, idempotencyKey: key.current }),
             });
             setResult(response);
-            await refresh();
+            void refresh();
             window.location.assign(response.mailto);
           } catch (error) {
             setError((error as Error).message);
@@ -59,6 +59,7 @@ export function CheckoutPanel({ bookingId }: { bookingId: string }) {
         <label>
           Payment method
           <select
+            aria-label="Payment method"
             value={method}
             required
             onChange={(event) => {
@@ -76,6 +77,7 @@ export function CheckoutPanel({ bookingId }: { bookingId: string }) {
         <label>
           Payment purpose
           <select
+            aria-label="Payment purpose"
             value={purpose}
             onChange={(event) => {
               setPurpose(event.target.value as 'deposit' | 'balance');

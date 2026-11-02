@@ -141,7 +141,7 @@ export function WorkspaceLogin() {
               </label>
               <label>
                 I’m here as
-                <select {...register('role')}>
+                <select aria-label="I’m here as" {...register('role')}>
                   <option value="client">A client</option>
                   <option value="artist">An artist</option>
                   <option value="studio">A studio owner</option>

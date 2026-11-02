@@ -291,7 +291,7 @@ export function bookingRoutes(app, { pool }) {
     res.json({
       messages: (
         await pool.query(
-          'SELECT m.id,m.sender_id,m.body,m.created_at,u.name AS sender_name FROM venue_app.messages m JOIN venue_app.users u ON u.id=m.sender_id WHERE m.booking_id=$1 ORDER BY m.created_at LIMIT 300',
+          'SELECT latest.* FROM (SELECT m.id,m.sender_id,m.body,m.created_at,u.name AS sender_name FROM venue_app.messages m JOIN venue_app.users u ON u.id=m.sender_id WHERE m.booking_id=$1 ORDER BY m.created_at DESC LIMIT 300) latest ORDER BY latest.created_at',
           [booking.id],
         )
       ).rows,

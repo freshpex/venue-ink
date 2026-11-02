@@ -28,6 +28,7 @@ export type Field = {
 function Input({ field }: { field: Field }) {
   const [visible, setVisible] = useState(false);
   const common = {
+    'aria-label': field.label,
     name: field.name,
     required: field.required,
     min: field.min,
@@ -105,8 +106,8 @@ export function SaveForm({
     setError('');
     try {
       await onSave(data);
-      await refresh();
       toast.success('Saved');
+      void refresh();
     } catch (err) {
       setError((err as Error).message);
     } finally {

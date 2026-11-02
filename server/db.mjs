@@ -13,6 +13,8 @@ export function connectionConfig(value = process.env.DATABASE_URL, { direct = fa
     max: 5,
     connectionTimeoutMillis: 15000,
     idleTimeoutMillis: 30000,
+    keepAlive: true,
+    maxLifetimeSeconds: 300,
     statement_timeout: 20000,
   };
 }
@@ -36,16 +38,25 @@ export async function migrateDatabase(pool) {
   }
 }
 export async function transaction(pool, operation) {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    const result = await operation(client);
-    await client.query('COMMIT');
-    return result;
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
+  // Only database work belongs in operation. A transaction may be replayed after
+  // a dropped connection before COMMIT; an ambiguous COMMIT is never replayed.
+  for(let attempt=0;attempt<2;attempt++){
+    let client,commitAttempted=false,discard=false;
+    try{
+      client=await pool.connect();
+      await client.query('BEGIN');
+      const result=await operation(client);
+      commitAttempted=true;
+      await client.query('COMMIT');
+      return result;
+    }catch(error){
+      const transient=['ECONNRESET','EPIPE','08000','08003','08006','57P01','57P02','57P03','40001','40P01'].includes(error.code)||/^Connection (terminated|closed|ended)/i.test(error.message||'');
+      discard=transient;
+      if(client){try{await client.query('ROLLBACK');}catch{discard=true;}}
+      if(commitAttempted||!transient||attempt===1)throw error;
+    }finally{
+      client?.release(discard?new Error('Discarding interrupted database session'):undefined);
+    }
+    await new Promise(resolve=>setTimeout(resolve,100));
   }
 }
