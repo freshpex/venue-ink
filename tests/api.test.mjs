@@ -1,108 +1,23 @@
-import { beforeAll, afterAll, describe, expect, it } from 'vitest';
-import { newDb } from 'pg-mem';
+import { beforeAll,afterAll,it,expect } from 'vitest';
 import supertest from 'supertest';
-import { createApp, migration } from '../server/app.mjs';
-const memory = newDb();
-const { Pool } = memory.adapters.createPg();
-const pool = new Pool();
-const origin = 'http://localhost:5173';
-const app = createApp({
-  pool,
-  secret: 'test-secret-with-more-than-thirty-two-characters',
-  origins: [origin],
-  limit: 100,
-});
-const agent = supertest.agent(app);
-const mutation = (req) => req.set('Origin', origin).set('X-Requested-With', 'VenueWorkspace');
-beforeAll(async () => {
-  await pool.query(migration);
-});
-afterAll(async () => {
-  await pool.end();
-});
-describe('workspace API', () => {
-  it('reports database readiness', async () => {
-    const r = await agent.get('/api/health');
-    expect(r.status).toBe(200);
-    expect(r.body.ready).toBe(true);
-  });
-  it('protects private records', async () => {
-    expect((await supertest(app).get('/api/ideas')).status).toBe(401);
-  });
-  it('rejects untrusted mutation origins', async () => {
-    const r = await agent.post('/api/auth/register').send({});
-    expect(r.status).toBe(403);
-  });
-  it('validates registrations server-side', async () => {
-    const r = await mutation(agent.post('/api/auth/register')).send({
-      email: 'bad',
-      password: 'short',
-      name: 'A',
-    });
-    expect(r.status).toBe(400);
-  });
-  it('registers and uses an HttpOnly session without exposing a hash', async () => {
-    const r = await mutation(agent.post('/api/auth/register')).send({
-      email: 'artist@example.com',
-      password: 'a-very-long-password',
-      name: 'Example Artist',
-    });
-    expect(r.status).toBe(201);
-    expect(r.body.user.password_hash).toBeUndefined();
-    expect(r.headers['set-cookie'][0]).toContain('HttpOnly');
-    expect((await agent.get('/api/auth/me')).body.user.email).toBe('artist@example.com');
-  });
-  it('rejects duplicate accounts', async () => {
-    const r = await mutation(agent.post('/api/auth/register')).send({
-      email: 'ARTIST@example.com',
-      password: 'another-long-password',
-      name: 'Another',
-    });
-    expect(r.status).toBe(409);
-  });
-  it('validates idea payload and stores owned records', async () => {
-    expect((await mutation(agent.post('/api/ideas')).send({ title: '' })).status).toBe(400);
-    const r = await mutation(agent.post('/api/ideas')).send({
-      title: 'Botanical collection',
-    });
-    expect(r.status).toBe(201);
-    const list = await agent.get('/api/ideas');
-    expect(list.body.ideas[0].title).toBe('Botanical collection');
-  });
-  it('isolates another user from existing ideas', async () => {
-    const other = supertest.agent(app);
-    await mutation(other.post('/api/auth/register')).send({
-      email: 'second@example.com',
-      password: 'second-long-password',
-      name: 'Second Artist',
-    });
-    const own = await agent.get('/api/ideas');
-    expect((await other.get('/api/ideas')).body.ideas).toEqual([]);
-    expect((await mutation(other.delete('/api/ideas/' + own.body.ideas[0].id))).status).toBe(404);
-  });
-  it('deletes only the owner’s idea', async () => {
-    const result = await agent.get('/api/ideas');
-    expect((await mutation(agent.delete('/api/ideas/' + result.body.ideas[0].id))).status).toBe(
-      200,
-    );
-    expect((await agent.get('/api/ideas')).body.ideas).toEqual([]);
-  });
-  it('revokes sessions on logout and rejects wrong passwords', async () => {
-    const cookies = (
-      await mutation(agent.post('/api/auth/login')).send({
-        email: 'artist@example.com',
-        password: 'a-very-long-password',
-      })
-    ).headers['set-cookie'];
-    expect((await mutation(agent.post('/api/auth/logout'))).status).toBe(200);
-    expect((await supertest(app).get('/api/auth/me').set('Cookie', cookies)).status).toBe(401);
-    expect(
-      (
-        await mutation(agent.post('/api/auth/login')).send({
-          email: 'artist@example.com',
-          password: 'wrong-long-password',
-        })
-      ).status,
-    ).toBe(401);
-  });
-});
+import { randomUUID } from 'node:crypto';
+import bcrypt from 'bcryptjs';
+import { fixture } from './helpers/platform.mjs';
+let f,booking,payment,asset;
+beforeAll(async()=>{f=await fixture();},60000);
+afterAll(async()=>{await f?.cleanup();},60000);
+it('connects to the configured database and verifies the seeded admin password',async()=>{expect((await supertest(f.app).get('/api/health')).body.ready).toBe(true);const admin=(await f.pool.query('SELECT role,password_hash FROM venue_app.users WHERE email=$1',['admin@venue.com'])).rows[0];expect(admin.role).toBe('admin');expect(await bcrypt.compare(process.env.SEED_ADMIN_PASSWORD,admin.password_hash)).toBe(true);});
+it('rejects unauthorized records, origins and role escalation',async()=>{expect((await supertest(f.app).get('/api/bookings')).status).toBe(401);expect((await supertest(f.app).post('/api/auth/register').send({})).status).toBe(403);expect((await f.mutation(f.client.agent.post('/api/auth/register')).send({name:'Escalation',email:'escalation@venue.test',password:'LongPassword42!',role:'admin'})).status).toBe(400);expect((await f.client.agent.get('/api/admin/users')).status).toBe(403);});
+it('serves every authenticated workspace collection',async()=>{for(const path of ['/dashboard','/profile','/bookings','/payments','/notifications','/support','/ideas','/assets'])expect((await f.client.agent.get('/api'+path)).status,path).toBe(200);for(const path of ['/workspace/services','/workspace/flash','/workspace/events','/team'])expect((await f.artist.agent.get('/api'+path)).status,path).toBe(200);for(const path of ['/overview','/users','/support','/articles','/settings','/audit'])expect((await f.admin.get('/api/admin'+path)).status,path).toBe(200);});
+it('validates real calendar dates',async()=>{expect((await supertest(f.app).get('/api/availability').query({artistId:f.artist.user.id,serviceId:f.service.id,date:'2027-02-31'})).status).toBe(400);});
+it('stores reference images privately and checks ownership',async()=>{const result=await f.mutation(f.client.agent.post('/api/assets')).send({filename:'reference.png',mimeType:'image/png',data:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0WQAAAAASUVORK5CYII='});expect(result.status).toBe(201);asset=result.body.asset;expect((await supertest(f.app).get('/api/assets/'+asset.id)).status).toBe(404);expect((await f.outsider.agent.get('/api/assets/'+asset.id)).status).toBe(404);expect((await f.client.agent.get('/api/assets/'+asset.id)).status).toBe(200);expect((await f.mutation(f.outsider.agent.post('/api/bookings')).send({...f.bookingInput,idempotencyKey:randomUUID(),assetIds:[asset.id]})).status).toBe(403);});
+it('creates one real booking during concurrent retries and retains its date',async()=>{const payload={...f.bookingInput,assetIds:[asset.id]};const results=await Promise.all([f.mutation(f.client.agent.post('/api/bookings')).send(payload),f.mutation(f.client.agent.post('/api/bookings')).send(payload)]);expect(results.map(r=>r.status).sort()).toEqual([200,201]);expect(results[0].body.booking.id).toBe(results[1].body.booking.id);expect(results[0].body.booking.starts_at).toBeTruthy();booking=results[0].body.booking;expect((await f.mutation(f.client.agent.post('/api/bookings')).send({...payload,title:'Changed artwork'})).status).toBe(409);});
+it('protects booking details and conversation from another client',async()=>{expect((await f.outsider.agent.get('/api/bookings/'+booking.id)).status).toBe(404);expect((await f.outsider.agent.get('/api/bookings/'+booking.id+'/messages')).status).toBe(404);expect((await f.mutation(f.outsider.agent.post('/api/bookings/'+booking.id+'/messages')).send({body:'Access attempt'})).status).toBe(404);expect((await f.artist.agent.get('/api/assets/'+asset.id)).status).toBe(200);});
+it('persists the booking conversation',async()=>{expect((await f.mutation(f.client.agent.post('/api/bookings/'+booking.id+'/messages')).send({body:'Can we discuss the placement?'})).status).toBe(201);expect((await f.artist.agent.get('/api/bookings/'+booking.id+'/messages')).body.messages[0].body).toContain('placement');});
+it('requires artist review and serializes conflicting confirmations',async()=>{expect((await f.mutation(f.client.agent.patch('/api/bookings/'+booking.id)).send({status:'confirmed'})).status).toBe(403);const other=await f.mutation(f.outsider.agent.post('/api/bookings')).send({...f.bookingInput,idempotencyKey:randomUUID()});expect(other.status).toBe(201);const results=await Promise.all([f.mutation(f.artist.agent.patch('/api/bookings/'+booking.id)).send({status:'confirmed'}),f.mutation(f.artist.agent.patch('/api/bookings/'+other.body.booking.id)).send({status:'confirmed'})]);expect(results.map(r=>r.status).sort()).toEqual([200,409]);const winning=results[0].status===200?booking.id:other.body.booking.id;expect((await supertest(f.app).get('/api/availability').query({artistId:f.artist.user.id,serviceId:f.service.id,date:f.bookingInput.startsAt.slice(0,10)})).body.slots.some(s=>s.startsAt===f.bookingInput.startsAt)).toBe(false);if(winning!==booking.id){await f.mutation(f.artist.agent.patch('/api/bookings/'+winning)).send({status:'cancelled'});expect((await f.mutation(f.artist.agent.patch('/api/bookings/'+booking.id)).send({status:'confirmed'})).status).toBe(200);}});
+it('saves each requested payment method and produces the exact email recipient and details',async()=>{const methods=(await supertest(f.app).get('/api/site')).body.paymentMethods;expect(methods).toHaveLength(8);for(const method of methods){const result=await f.mutation(f.client.agent.post('/api/checkout')).send({bookingId:booking.id,method,purpose:'balance',idempotencyKey:randomUUID()});expect(result.status,result.body.message).toBe(201);expect(result.body.mailto).toMatch(/^mailto:payment@venue.com\?/);expect(result.body.details).toContain(method);expect(result.body.details).toContain('Botanical linework');expect(result.body.payment.status).toBe('requested');expect(result.body.payment.amount_cents).toBe(15000);payment=result.body.payment;}expect((await f.client.agent.get('/api/bookings/'+booking.id)).body.booking.paid_cents).toBe(0);});
+it('does not let the client mark a payment received or inject an amount',async()=>{expect((await f.mutation(f.client.agent.patch('/api/payments/'+payment.id)).send({status:'received',receiptReference:'Attempt',amountCents:15000})).status).toBe(404);expect((await f.mutation(f.client.agent.post('/api/checkout')).send({bookingId:booking.id,method:'PayPal',amountCents:1,idempotencyKey:randomUUID()})).status).toBe(400);});
+it('records verified receipt once and prevents overpayment',async()=>{expect((await f.mutation(f.artist.agent.patch('/api/payments/'+payment.id)).send({status:'received',receiptReference:'QA-RECEIPT',amountCents:15001})).status).toBe(400);expect((await f.mutation(f.artist.agent.patch('/api/payments/'+payment.id)).send({status:'received',receiptReference:'QA-RECEIPT',amountCents:15000})).status).toBe(200);expect((await f.mutation(f.artist.agent.patch('/api/payments/'+payment.id)).send({status:'received',receiptReference:'QA-RECEIPT',amountCents:15000})).status).toBe(409);expect((await f.client.agent.get('/api/bookings/'+booking.id)).body.booking.paid_cents).toBe(15000);expect((await f.mutation(f.client.agent.post('/api/checkout')).send({bookingId:booking.id,method:'PayPal',idempotencyKey:randomUUID()})).status).toBe(409);});
+it('stores support requests and returns administrator replies',async()=>{const result=await f.mutation(f.client.agent.post('/api/contact')).send({name:'QA Client',email:f.client.email,category:'Account support',message:'Please help me with my account settings.'});expect(result.status).toBe(201);f.supportRefs.push(result.body.request.reference);expect((await f.mutation(f.admin.patch('/api/admin/support/'+result.body.request.id)).send({status:'resolved',reply:'Your account settings are available in My account.'})).status).toBe(200);expect((await f.client.agent.get('/api/support')).body.requests[0].reply).toContain('My account');});
+it('protects the administrator from self-demotion',async()=>{const admin=(await f.admin.get('/api/auth/me')).body.user;expect((await f.mutation(f.admin.patch('/api/admin/users/'+admin.id)).send({role:'client'})).status).toBe(400);});
+it('revokes the session after logout',async()=>{expect((await f.mutation(f.outsider.agent.post('/api/auth/logout')).send({})).status).toBe(200);expect((await f.outsider.agent.get('/api/auth/me')).status).toBe(401);});

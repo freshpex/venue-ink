@@ -1,55 +1,35 @@
-# Venue Ink: More ink. Less admin.
+# Venue platform
 
-An independent React/TypeScript redesign concept for Venue’s artist and studio booking platform. Includes a multipage editorial site, 20 licensed stock photographs, interactive examples and a separate Node.js/PostgreSQL preview workspace.
+React 19, TypeScript, Vite, Tailwind, Motion, Radix, TanStack Query and an Express 5 / Neon PostgreSQL backend. Public photography is licensed and documented in `docs/PHOTOGRAPHY.md` and `src/data/image-manifest.json`.
 
-## Run locally
+## Local development
 
-Requirements: Node 22.14+ and npm. Install once with `npm ci`, then `npm run dev` (http://localhost:5173). The public site and local demos do not require a backend.
+Use Node 22.14 or newer. Run `npm ci`. Copy `.env.example` to `.env` and set the database URL, a random JWT secret of at least 32 characters, initial administrator email and password. Never commit `.env`.
 
-For the private preview workspace, create a PostgreSQL database and copy `.env.example` to `.env`. Set `DATABASE_URL`, a random `JWT_SECRET` of at least 32 characters and `CLIENT_ORIGINS`. Run `npm run dev:server` in another terminal. Vite proxies `/api` to port 3001. The server creates its two namespaced tables and index idempotently at startup. No production Venue tables are accessed.
+Run `npm run db:setup` to apply migrations and seed. Setup affects only `venue_app`; it preserves other database tables. Existing administrator passwords are never reset by seeding. Run `npm run dev:server` and `npm run dev` in separate terminals. Open http://localhost:5173. Vite forwards `/api` to port 3001.
 
-## Scripts
+For a production build, run `npm run build`. Set `NODE_ENV=production`, `CLIENT_ORIGINS` to the exact HTTPS origin and `SITE_URL` to the public HTTPS URL; then `npm start` serves both the site and API. Set environment variables in the hosting service, not in source. Development uses ports 5173 and 3001. Production uses the host's `PORT`.
 
-| Command              | Purpose                                                                    |
-| -------------------- | -------------------------------------------------------------------------- |
-| `npm run dev`        | Vite frontend                                                              |
-| `npm run dev:server` | Node API with watch                                                        |
-| `npm run build`      | Strict TypeScript, production Vite bundle, route metadata/static fallbacks |
-| `npm run preview`    | Serve production frontend                                                  |
-| `npm start`          | Node API                                                                   |
-| `npm run lint`       | ESLint                                                                     |
-| `npm test`           | Fee calculations, server readiness and API/security tests                  |
-| `npm run test:e2e`   | Chromium, Firefox, WebKit journeys and responsive checks                   |
+## Workflows
 
-Install test browsers using `npx playwright install chromium firefox webkit` if not present. Tests use one worker. Do not run package installation and other npm tasks concurrently on this Windows checkout.
+- Client, artist and studio registration; secure HttpOnly sessions; password visibility controls; password changes; session revocation.
+- Published artist/studio pages, themes, service menu, availability and original artwork uploads.
+- Booking requests with private references, timezone-aware slots, review, conflict-protected confirmation, rescheduling, cancellation and completion.
+- Persisted booking conversations, notifications, saved artwork and personal ideas.
+- Studio invitations, service management and event booking with capacity controls.
+- Checkout saves a payment enquiry and opens email to `payment@venue.com`. Methods: Western Union, MoneyGram, Bank Transfer, IBAN Bank Transfer, Apple Pay, PayPal, Apple iTunes and Cryptocurrency (BTC / ETH / USDT). Payment remains requested until staff verify receipt. No card or wallet credentials are collected.
+- Support enquiries, admin replies, account restrictions/roles, journal publishing, settings and an activity log.
 
-## What works
+Uploaded images are compressed in the browser and stored durably in PostgreSQL (2 MB per image, 40 MB per user). Reference images are private; publishing a profile photograph or flash image makes that image public. The application does not use ephemeral Render disk for uploads.
 
-- Home, artist, studio, feature, booking, flash, artist website, payment, pricing, mobile app, service, about, journal, article, help, contact, onboarding, credits, demo, workspace and 404 routes.
-- Five-step example booking, in-memory image previews, validation and collision checks. Only the fictional request summary persists locally; example contact details and reference files are not persisted.
-- Calendar month/day navigation, team filtering, request approval/decline, local messaging and collection selection. Reset clears local requests.
-- Flash search/category filtering, saving preferences during the session, keyboard dismissible lightbox and navigation.
-- Three artist-page visual themes, published-plan fee estimator, journal search/filter and searchable FAQs.
-- Contact validates inputs and prepares an email draft. It never claims the message was sent.
-- Separate workspace authentication, bcrypt password hashes, HttpOnly signed cookies, session revocation on logout, allowlisted origins, CSRF request header, rate limiting, private idea creation/list/delete and parameterized database queries.
-- Cold start: health polling for up to 150 seconds before sending login once. Button states explain connection progress; cancellation and retries preserve entered details. Every password field has an eye control.
+## Render
 
-## Render deployment
+Connect this folder's repository to Render using `render.yaml`. The blueprint defines one free Node web service for the frontend and API, avoiding cross-site cookie restrictions. Set `DATABASE_URL`, `CLIENT_ORIGINS`, `SITE_URL`, `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` in Render. Use the assigned Render HTTPS URL for both origin variables. `VITE_API_URL` stays empty for this same-origin setup. The blueprint generates a JWT secret. Change the initial admin password from the account screen after first sign-in.
 
-Use `render.yaml` as a Blueprint with this directory at the repository root. If the repository root is the parent `tatoos` directory, set `rootDir: venue-ink` for both services. Choose a **persistent external PostgreSQL database** and set `DATABASE_URL`; never store user records on the free service filesystem. The blueprint deliberately does not create a short-lived free database.
+Startup applies tracked migrations using a direct Neon connection and an advisory lock, retries transient failures, then serves readiness at `/api/health`. Login retains entered details, displays connection progress and waits up to 150 seconds while a free Render service starts. It supports cancellation and retry. Database health remains independent of browser rendering.
 
-1. Set API `CLIENT_ORIGINS` to the exact HTTPS frontend origin (comma-separated if needed; no trailing slash).
-2. Set frontend `VITE_API_URL` to the API’s HTTPS Render URL and rebuild. The API secret stays server-side.
-3. The API listens on Render’s `PORT`, binds `0.0.0.0`, checks `/api/health`, retries initial database connection and shuts down gracefully.
-4. Verify registration, login, cookies and private records on the deployed origins. Cross-site cookies may be blocked by browser privacy settings; use same-site custom subdomains or a reverse proxy for reliable production sessions. Never put JWTs into localStorage as a workaround.
-5. Free Render services sleep after inactivity; the UI tolerates ordinary wake-up delays, but cannot guarantee provider uptime. See [Render free-service limitations](https://render.com/docs/free).
+The repository includes deployment configuration. A hosted deployment still requires the owner's Render account and environment configuration.
 
-The private Sites preview hosts the static frontend only. The Node API must be deployed separately to Render, then its URL supplied at build time. No Render credentials or database service were provided during implementation. The marketing site and examples remain usable without them; private workspace authentication will show a clear connection error until configured.
+## Verification
 
-## Architecture and boundaries
-
-Feature folders contain the booking wizard and shared demo state. Radix provides focus-managed dialogs/accordions; the shadcn-style Button uses CVA/Slot and shared tokens. Motion handles coordinated animations; Embla handles touch-friendly stories; Zustand persists fictional requests; React Hook Form/Zod validates forms; TanStack Query manages authenticated asynchronous state; Sonner supplies honest feedback. No unnecessary GSAP/Lenis/Lottie runtime is loaded for effects already handled by Motion/CSS.
-
-The app preserves verified external Venue actions, not an unavailable production integration. No payment endpoint, fake checkout, live stock inventory, unauthorized testimonial or automatic newsletter subscription was introduced. Only official links can reach real Venue records.
-
-See [discovery and source audit](docs/DISCOVERY.md), [photography licensing](docs/PHOTOGRAPHY.md) and [verification report](docs/VERIFICATION.md). The public image manifest lives at `src/data/image-manifest.json`. The concept remains noindex; authorized production release needs final legal/content review, live provider integration and full SEO prerendering.
+Run `npm run format`, `npm run format:check`, `npm run lint`, `npm test`, `npm run build` and `npm run test:e2e`. API integration tests use temporary accounts and records in the configured application schema and remove only their own records. They do not reset the database. Chromium, Firefox and WebKit browser projects cover public routes, mobile layouts, authentication and real booking/payment flows. Actual results are recorded in `docs/IMPLEMENTATION_STATUS.md`.

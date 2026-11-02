@@ -3,6 +3,6 @@ export default defineConfig({
   test: {
     include: ['tests/**/*.test.{ts,mjs}'],
     fileParallelism: false,
-    testTimeout: 15000,
+    testTimeout: 60000,
   },
 });

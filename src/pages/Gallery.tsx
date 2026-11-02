@@ -1,151 +1,140 @@
 import { useState } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
 import * as Dialog from '@radix-ui/react-dialog';
-import { ArrowUpRight, X, Search, Heart, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowUpRight, Heart, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { CTA, Label, PageIntro, Photo, Reveal } from '../components/Primitives';
-import { BookingWizard } from '../features/booking/BookingWizard';
-const collection = [
-  {
-    name: 'The botanical study',
-    image: 'tattoo-floral-detail',
-    category: 'Botanical',
-  },
-  {
-    name: 'Lines with a life of their own',
-    image: 'tattoo-back-art',
-    category: 'Blackwork',
-  },
-  {
-    name: 'Something worth keeping',
-    image: 'tattoo-arm-floral',
-    category: 'Botanical',
-  },
-  {
-    name: 'A quiet kind of statement',
-    image: 'tattoo-hands',
-    category: 'Details',
-  },
-  { name: 'Made by hand', image: 'tattoo-overhead', category: 'In the studio' },
-  { name: 'A closer look', image: 'tattoo-process', category: 'Details' },
-  {
-    name: 'Time, care, craft',
-    image: 'client-session',
-    category: 'In the studio',
-  },
-  {
-    name: 'The next chapter',
-    image: 'tattoo-consultation',
-    category: 'In the studio',
-  },
-];
+import { Empty, Failure, Loading } from '../components/AsyncState';
+import { BookingWizard } from '../features/booking/BookingFlow';
+import { useApi, useSession, useRefresh, assetUrl, money } from '../lib/queries';
+import { request } from '../lib/api';
+import type { FlashDesign } from '../lib/types';
 export default function Gallery() {
+  const [params] = useSearchParams();
+  const query = useApi<{ designs: FlashDesign[] }>(
+    '/flash' + (params.get('artist') ? '?artistId=' + params.get('artist') : ''),
+  );
+  const session = useSession();
+  const saved = useApi<{ ids: string[] }>('/saved-designs', { enabled: !!session.data });
+  const refresh = useRefresh();
   const [filter, setFilter] = useState('All work');
   const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState<number | null>(null);
-  const [favorites, setFavorites] = useState<string[]>([]);
-  const [booking, setBooking] = useState(false);
-  const [design, setDesign] = useState('Custom artwork');
-  const items = collection.filter(
-    (x) =>
-      (filter === 'All work' || x.category === filter) &&
-      x.name.toLowerCase().includes(search.toLowerCase()),
+  const [selected, setSelected] = useState<FlashDesign | null>(null);
+  const [booking, setBooking] = useState<FlashDesign | null>(null);
+  const [onlySaved, setOnlySaved] = useState(false);
+  const designs = query.data?.designs || [];
+  const items = designs.filter(
+    (item) =>
+      (filter === 'All work' || item.category === filter) &&
+      (!onlySaved || saved.data?.ids.includes(item.id)) &&
+      (item.title + ' ' + item.artist_name).toLowerCase().includes(search.toLowerCase()),
   );
-  const current = selected === null ? null : items[selected];
   return (
     <>
       <PageIntro
         label="FROM IDEA TO INK"
         title="Made to be inked."
-        text="A home for the work you can’t wait to make. Explore how collections could look, then try an example booking."
+        text="Original flash, published by the artists. Find a piece that feels like yours and start the conversation."
       />
       <section className="container gallery-page">
         <div className="gallery-controls">
           <div className="filter-list">
-            {['All work', 'Botanical', 'Blackwork', 'Details', 'In the studio'].map((f) => (
+            {['All work', ...new Set(designs.map((d) => d.category))].map((c) => (
               <button
-                key={f}
-                className={f === filter ? 'active' : ''}
-                aria-pressed={f === filter}
-                onClick={() => {
-                  setFilter(f);
-                  setSelected(null);
-                }}
+                key={c}
+                aria-pressed={filter === c}
+                className={filter === c ? 'active' : ''}
+                onClick={() => setFilter(c)}
               >
-                {f}
+                {c}
               </button>
             ))}
+            {session.data && (
+              <button aria-pressed={onlySaved} onClick={() => setOnlySaved((v) => !v)}>
+                <Heart size={15} />
+                Saved work
+              </button>
+            )}
           </div>
           <label className="search-field">
-            <Search size={18} />
             <input
               aria-label="Search gallery"
+              placeholder="Find your next piece"
               value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setSelected(null);
-              }}
-              placeholder="Find a little inspiration"
+              onChange={(e) => setSearch(e.target.value)}
             />
           </label>
         </div>
-        <div className="gallery-disclaimer">
-          <Label>EDITORIAL COLLECTION SHOWCASE</Label>
-          <p>
-            Real stock photography, illustrative collection names. These are not available flash
-            designs or Venue artist listings.
-          </p>
-        </div>
-        <p className="sr-only" aria-live="polite">
-          {items.length} results
-        </p>
-        <div className="gallery-masonry">
-          {items.map((item, i) => (
-            <Reveal className="gallery-item" delay={(i % 3) * 0.06} key={item.name}>
-              <button
-                className="gallery-image"
-                onClick={() => setSelected(i)}
-                aria-label={`View ${item.name}`}
-              >
-                <Photo name={item.image} alt={item.name} />
-                <span className="gallery-view">
-                  <ArrowUpRight />
-                </span>
-              </button>
-              <div className="gallery-item-title">
-                <div>
-                  <small>{item.category}</small>
-                  <h2>{item.name}</h2>
-                </div>
+        {query.isPending ? (
+          <Loading />
+        ) : query.isError ? (
+          <Failure message={query.error.message} retry={() => query.refetch()} />
+        ) : !items.length ? (
+          <Empty
+            title="Room for the next great piece."
+            text="No published artwork matches this collection yet. Start with a custom idea and find your artist."
+            to="/artists"
+            action="Find an artist"
+          />
+        ) : (
+          <div className="gallery-masonry">
+            {items.map((item) => (
+              <Reveal className="gallery-item" key={item.id}>
                 <button
-                  className={`icon-button ${favorites.includes(item.name) ? 'favorite' : ''}`}
-                  aria-label={`${favorites.includes(item.name) ? 'Unsave' : 'Save'} ${item.name}`}
-                  aria-pressed={favorites.includes(item.name)}
-                  onClick={() => {
-                    setFavorites((s) =>
-                      s.includes(item.name) ? s.filter((n) => n !== item.name) : [...s, item.name],
-                    );
-                    toast('Example collection preference updated');
-                  }}
+                  className="gallery-image"
+                  onClick={() => setSelected(item)}
+                  aria-label={'View ' + item.title}
                 >
-                  <Heart size={20} fill={favorites.includes(item.name) ? 'currentColor' : 'none'} />
+                  <img src={assetUrl(item.image_url)} alt={item.title} loading="lazy" />
+                  <span className="gallery-view">
+                    <ArrowUpRight />
+                  </span>
                 </button>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-        {items.length === 0 && (
-          <div className="empty-state">
-            <h2>No work in this corner yet.</h2>
-            <p>Try another search or collection.</p>
-            <Button
-              onClick={() => {
-                setSearch('');
-                setFilter('All work');
-              }}
-            >
-              Show all work
-            </Button>
+                <div className="gallery-item-title">
+                  <div>
+                    <small>
+                      {item.artist_name} · {item.category}
+                    </small>
+                    <h2>{item.title}</h2>
+                    <span>{money(item.price_cents)}</span>
+                  </div>
+                  {session.data ? (
+                    <button
+                      className="icon-button"
+                      aria-label={
+                        (saved.data?.ids.includes(item.id) ? 'Unsave ' : 'Save ') + item.title
+                      }
+                      aria-pressed={!!saved.data?.ids.includes(item.id)}
+                      onClick={async () => {
+                        try {
+                          await request('/saved-designs/' + item.id, {
+                            method: 'PUT',
+                            body: JSON.stringify({ saved: !saved.data?.ids.includes(item.id) }),
+                          });
+                          refresh();
+                        } catch (error) {
+                          toast.error((error as Error).message);
+                        }
+                      }}
+                    >
+                      <Heart
+                        size={21}
+                        fill={saved.data?.ids.includes(item.id) ? 'currentColor' : 'none'}
+                      />
+                    </button>
+                  ) : (
+                    <Link
+                      className="icon-button"
+                      aria-label="Sign in to save artwork"
+                      to="/login?next=/flash"
+                    >
+                      <Heart size={21} />
+                    </Link>
+                  )}
+                </div>
+              </Reveal>
+            ))}
           </div>
         )}
       </section>
@@ -159,24 +148,21 @@ export default function Gallery() {
               Lose the chaos.
             </h2>
             <p>
-              Venue lets artists organize flash, build collections and choose whether a design is
-              repeatable. Your booking link gives clients a way to find the work and send a request.
+              Publish your original artwork, organize it by category and choose whether a piece can
+              be repeated. Every request comes back to your workspace.
             </p>
-            <Button
-              onClick={() => {
-                setDesign('Custom artwork');
-                setBooking(true);
-              }}
-            >
-              Try the booking example <ArrowUpRight size={18} />
+            <Button asChild>
+              <Link to={session.data ? '/dashboard?tab=artwork' : '/register?role=artist'}>
+                Make room for my work
+                <ArrowUpRight size={18} />
+              </Link>
             </Button>
           </Reveal>
           <Photo name="neon-tattoo-tools" alt="Tattoo equipment in a colorful studio" />
         </div>
       </section>
-      <CTA />
       <Dialog.Root
-        open={current !== null}
+        open={!!selected}
         onOpenChange={(v) => {
           if (!v) setSelected(null);
         }}
@@ -187,46 +173,45 @@ export default function Gallery() {
             <Dialog.Close aria-label="Close image" className="icon-button lightbox-close">
               <X />
             </Dialog.Close>
-            {current && (
+            {selected && (
               <>
-                <Photo name={current.image} alt={current.name} />
+                <img src={assetUrl(selected.image_url)} alt={selected.title} />
                 <div className="lightbox-caption">
                   <div>
-                    <Dialog.Title>{current.name}</Dialog.Title>
+                    <Dialog.Title>{selected.title}</Dialog.Title>
                     <Dialog.Description>
-                      Editorial photograph · example collection
+                      {selected.description} · {selected.artist_name}
                     </Dialog.Description>
+                    <p>
+                      {money(selected.price_cents)} · {selected.size_note} ·{' '}
+                      {selected.placement_note}
+                    </p>
                   </div>
                   <Button
                     onClick={() => {
-                      setDesign(current.name);
+                      setBooking(selected);
                       setSelected(null);
-                      setBooking(true);
                     }}
                   >
-                    Try an example request <ArrowUpRight size={17} />
+                    Request this piece
+                    <ArrowUpRight size={17} />
                   </Button>
                 </div>
-                <button
-                  className="lightbox-prev icon-button"
-                  aria-label="Previous photograph"
-                  onClick={() => setSelected((selected! + items.length - 1) % items.length)}
-                >
-                  <ChevronLeft />
-                </button>
-                <button
-                  className="lightbox-next icon-button"
-                  aria-label="Next photograph"
-                  onClick={() => setSelected((selected! + 1) % items.length)}
-                >
-                  <ChevronRight />
-                </button>
               </>
             )}
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-      <BookingWizard open={booking} onOpenChange={setBooking} design={design} />
+      <BookingWizard
+        open={!!booking}
+        onOpenChange={(v) => {
+          if (!v) setBooking(null);
+        }}
+        artistId={booking?.artist_id}
+        flashId={booking?.id}
+        design={booking?.title}
+      />
+      <CTA />
     </>
   );
 }

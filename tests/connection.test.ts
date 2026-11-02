@@ -10,7 +10,7 @@ describe('Render connection readiness', () => {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(new Response('<html>Starting</html>', { status: 503 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ ready: true }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ready: true }), { status: 200,headers:{'Content-Type':'application/json'} }));
     vi.stubGlobal('fetch', fetch);
     const states: string[] = [];
     const result = waitForServer((s) => states.push(s), new AbortController().signal, {

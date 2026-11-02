@@ -1,9 +1,9 @@
 services:
   - type: web
-    name: venue-preview-api
+    name: venue-platform
     runtime: node
     plan: free
-    buildCommand: npm ci --omit=dev
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
@@ -11,30 +11,17 @@ services:
         value: production
       - key: NODE_VERSION
         value: 22.22.0
+      - key: COOKIE_SAME_SITE
+        value: lax
       - key: JWT_SECRET
         generateValue: true
       - key: DATABASE_URL
         sync: false
       - key: CLIENT_ORIGINS
         sync: false
-  - type: web
-    name: venue-ink
-    runtime: static
-    buildCommand: npm ci && npm run build
-    staticPublishPath: dist
-    envVars:
-      - key: NODE_VERSION
-        value: 22.22.0
-      - key: VITE_API_URL
+      - key: SITE_URL
         sync: false
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    headers:
-      - path: /*
-        name: X-Content-Type-Options
-        value: nosniff
-      - path: /assets/*
-        name: Cache-Control
-        value: public,max-age=31536000,immutable
+      - key: SEED_ADMIN_EMAIL
+        sync: false
+      - key: SEED_ADMIN_PASSWORD
+        sync: false

@@ -30,8 +30,14 @@ export async function request<T>(
     if (signal?.aborted) throw e;
     throw new ApiError('The server could not be reached. Check the connection and try again.', 0);
   }
-  if(!response.headers.get('content-type')?.includes('application/json'))throw new ApiError('The server is starting. Please keep this page open or try again shortly.',503);
-  const data=await response.json().catch(()=>{throw new ApiError('The server response could not be read. Please try again.',503);});
+  if (!response.headers.get('content-type')?.includes('application/json'))
+    throw new ApiError(
+      'The server is starting. Please keep this page open or try again shortly.',
+      503,
+    );
+  const data = await response.json().catch(() => {
+    throw new ApiError('The server response could not be read. Please try again.', 503);
+  });
   if (!response.ok)
     throw new ApiError(data.message || 'The request could not be completed.', response.status);
   return data as T;

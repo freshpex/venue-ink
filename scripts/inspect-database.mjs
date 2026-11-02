@@ -1,8 +1,5 @@
-import pg from 'pg';
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  connectionTimeoutMillis: 15000,
-});
+import { createPool } from '../server/db.mjs';
+const pool = createPool();
 try {
   const result = await pool.query(
     "SELECT table_schema,table_name FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog','information_schema') ORDER BY table_schema,table_name",

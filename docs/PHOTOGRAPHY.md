@@ -8,7 +8,7 @@ Source pages and their free-use labels were checked with online research on 2 No
 
 [Pexels License](https://www.pexels.com/license/) permits downloading, modifying, and using photographs in websites. Attribution is appreciated but not required. The license prohibits implying endorsement by the people or brands shown. It also restricts offensive depictions, stock redistribution, unaltered resale, and use as trademarks. The source license remains controlling.
 
-These are illustrative stock photographs. The people, tattoos, and studios shown have not been verified as Venue customers, employees, affiliated artists, or participating businesses. Do not pair them with a real testimonial author, identify them as a specific Venue member, or suggest the artwork is available for booking. Example profile imagery must remain clearly contextualized as part of the interactive product preview. A filename containing `artist` describes the intended visual slot, not a verified occupation or affiliation of a model.
+These are illustrative stock photographs. The people, tattoos, and studios shown have not been verified as Venue customers, employees, affiliated artists, or participating businesses. Do not pair them with a real testimonial author, identify them as a specific Venue member, or suggest the artwork is available for booking. Artist account photographs are uploaded by their owners; editorial photography supplies only contextual imagery. A filename containing `artist` describes the intended visual slot, not a verified occupation or affiliation of a model.
 
 No official Venue photography was copied into this implementation. Brand screenshots, product UI, and photographed subjects are distinct sources and should not be conflated.
 
@@ -40,3 +40,4 @@ No official Venue photography was copied into this implementation. Brand screens
 ## Replacement guidance
 
 Replace these illustrative photos with written-permission Venue member photography before presenting specific artist profiles, flash inventory, customer stories, or studio affiliations as factual. Keep the manifest synchronized when assets are replaced. Provide responsive dimensions and alt text from the manifest; use eager loading only for a page's main hero and lazy loading for images below the fold.
+

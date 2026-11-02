@@ -1,102 +1,68 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import {
-  ArrowUpRight,
-  Search,
-  ArrowLeft,
-  Copy,
-  ExternalLink,
-  Mail,
-  ArrowRight,
-} from 'lucide-react';
+import { Link, useLocation, useParams } from 'react-router-dom';
+import { ArrowUpRight, Copy, ArrowLeft, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { CTA, FAQs, Label, PageIntro, Photo, Reveal } from '../components/Primitives';
-import { articles, faqs, links } from '../data/site';
+import { Empty, Failure, Loading } from '../components/AsyncState';
+import { useApi, useRefresh, useSession } from '../lib/queries';
+import { request } from '../lib/api';
+import type { ArticleData } from '../lib/types';
+import { faqs } from '../data/site';
 import manifest from '../data/image-manifest.json';
-import { StudioDemo } from '../features/demo/StudioDemo';
-import { BookingWizard } from '../features/booking/BookingWizard';
 export function Journal() {
+  const query = useApi<{ articles: ArticleData[] }>('/articles');
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('All notes');
-  const filtered = articles.filter(
-    (a) =>
-      (category === 'All notes' || a.category === category) &&
-      (a.title + ' ' + a.originalTitle + ' ' + a.excerpt)
-        .toLowerCase()
-        .includes(search.toLowerCase()),
+  const filtered = (query.data?.articles || []).filter((a) =>
+    (a.title + ' ' + a.excerpt).toLowerCase().includes(search.toLowerCase()),
   );
   return (
     <>
       <PageIntro
         label="A LITTLE PERSPECTIVE"
         title="Notes from the studio."
-        text="The business, the craft and the bits in between. A reading list from the original Venue journal."
+        text="The business, the craft and the bits in between. Practical reading for your next chapter."
       />
       <section className="container journal-page">
-        <div className="gallery-controls">
-          <div className="filter-list">
-            {['All notes', ...new Set(articles.map((a) => a.category))].map((c) => (
-              <button
-                key={c}
-                aria-pressed={category === c}
-                className={category === c ? 'active' : ''}
-                onClick={() => setCategory(c)}
-              >
-                {c}
-              </button>
+        <label className="search-field">
+          <input
+            aria-label="Search journal"
+            placeholder="Find a good read"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </label>
+        {query.isPending ? (
+          <Loading />
+        ) : query.isError ? (
+          <Failure message={query.error.message} retry={() => query.refetch()} />
+        ) : (
+          <div className="journal-page-grid">
+            {filtered.map((a) => (
+              <Reveal key={a.id}>
+                <article className="journal-card">
+                  <Link to={'/journal/' + a.slug}>
+                    <div className="journal-image">
+                      <Photo name={a.image_name} alt={a.title} />
+                      <span className="journal-arrow">
+                        <ArrowUpRight />
+                      </span>
+                    </div>
+                    <small>{a.category}</small>
+                    <h2>{a.title}</h2>
+                    <p>{a.excerpt}</p>
+                    <span className="arrow-link">
+                      Read the story
+                      <ArrowUpRight size={17} />
+                    </span>
+                  </Link>
+                </article>
+              </Reveal>
             ))}
           </div>
-          <label className="search-field">
-            <Search size={18} />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              aria-label="Search journal"
-              placeholder="Find a good read"
-            />
-          </label>
-        </div>
-        <div className="journal-page-grid">
-          {filtered.map((a, i) => (
-            <Reveal key={a.slug}>
-              <article className="journal-card">
-                <Link to={`/journal/${a.slug}`}>
-                  <div className="journal-image">
-                    <Photo name={a.image} alt={a.originalTitle} />
-                    <span className="journal-arrow">
-                      <ArrowUpRight />
-                    </span>
-                  </div>
-                  <small>
-                    {a.category.toUpperCase()}
-                    <span>0{i + 1}</span>
-                  </small>
-                  <h2>{a.title}</h2>
-                  <p>{a.excerpt}</p>
-                  <span className="arrow-link">
-                    Read the overview <ArrowRight size={17} />
-                  </span>
-                </Link>
-              </article>
-            </Reveal>
-          ))}
-        </div>
-        {filtered.length === 0 && (
-          <div className="empty-state">
-            <h2>No notes found.</h2>
-            <Button
-              onClick={() => {
-                setSearch('');
-                setCategory('All notes');
-              }}
-            >
-              Show all notes
-            </Button>
-          </div>
+        )}
+        {!query.isPending && !query.isError && !filtered.length && (
+          <Empty title="No notes found." text="Try another subject or clear your search." />
         )}
       </section>
       <CTA />
@@ -105,254 +71,205 @@ export function Journal() {
 }
 export function Article() {
   const { slug } = useParams();
-  const article = articles.find((a) => a.slug === slug);
-  if (!article) return <NotFound />;
+  const query = useApi<{ article: ArticleData }>('/articles/' + slug);
+  if (query.isPending) return <Loading />;
+  if (query.isError) return <Failure message={query.error.message} />;
+  const a = query.data.article;
   return (
     <>
       <section className="container article-header">
         <Link className="back-link" to="/journal">
-          <ArrowLeft size={16} /> Back to the journal
+          <ArrowLeft size={16} />
+          Back to the journal
         </Link>
-        <Label>{article.category.toUpperCase()}</Label>
-        <h1>{article.originalTitle}</h1>
-        <p>{article.excerpt}</p>
+        <Label>{a.category}</Label>
+        <h1>{a.title}</h1>
+        <p>{a.excerpt}</p>
         <span className="article-source">
-          A reading note on the official Venue article. No invented author or publication date.
+          {a.author_name} ·{' '}
+          {new Date(a.published_at).toLocaleDateString('en-US', { dateStyle: 'long' })}
         </span>
       </section>
       <div className="container article-hero">
-        <Photo name={article.image} alt={article.originalTitle} eager />
+        <Photo name={a.image_name} alt={a.title} eager />
       </div>
       <article className="article-body">
-        <Label>THE READING NOTE</Label>
-        <h2>{article.title}</h2>
-        <p>{article.body}</p>
-        <p>
-          This page is a short original overview. The complete article, its author details and any
-          current business terms remain on Venue’s official journal.
-        </p>
-        <Button asChild variant="dark">
-          <a href={article.url}>
-            Read the full Venue article <ExternalLink size={17} />
-          </a>
-        </Button>
-        <div className="article-share">
-          <span>Pass it along.</span>
-          <button
-            className="arrow-link"
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(article.url);
-                toast.success('Original article link copied');
-              } catch {
-                toast.error('Could not copy. Open the original article to share its URL.');
-              }
-            }}
-          >
-            <Copy size={17} /> Copy original link
-          </button>
-        </div>
+        {a.body
+          ?.split('\n\n')
+          .map((paragraph, index) =>
+            paragraph.startsWith('## ') ? (
+              <h2 key={index}>{paragraph.slice(3)}</h2>
+            ) : (
+              <p key={index}>{paragraph}</p>
+            ),
+          )}
+        <button
+          className="arrow-link"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(location.href);
+              toast.success('Article link copied');
+            } catch {
+              toast.error('Copy is unavailable');
+            }
+          }}
+        >
+          <Copy size={17} />
+          Share this story
+        </button>
       </article>
-      <section className="container related-articles">
-        <Label>KEEP READING</Label>
-        <h2>A little more perspective.</h2>
-        <div className="journal-page-grid">
-          {articles
-            .filter((a) => a.slug !== slug)
-            .slice(0, 2)
-            .map((a) => (
-              <article className="journal-card" key={a.slug}>
-                <Link to={`/journal/${a.slug}`}>
-                  <Photo name={a.image} alt={a.originalTitle} />
-                  <h3>{a.title}</h3>
-                </Link>
-              </article>
-            ))}
-        </div>
-      </section>
       <CTA />
     </>
   );
 }
 export function Help() {
   const [search, setSearch] = useState('');
-  const filtered = faqs.filter((f) =>
-    (f.q + ' ' + f.a).toLowerCase().includes(search.toLowerCase()),
-  );
   return (
     <>
       <PageIntro
-        label="GOOD QUESTIONS. STRAIGHT ANSWERS."
+        label="HERE TO HELP"
         title="A little clarity."
-        text="Bookings, payments and your next step. Find an answer, then get back to the good stuff."
+        text="Find your way around booking, your account and the studio workspace."
       />
       <section className="container help-page">
         <label className="search-field">
-          <Search />
           <input
-            aria-label="Search frequently asked questions"
-            placeholder="What’s on your mind?"
+            aria-label="Search help"
+            placeholder="What would you like to know?"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </label>
-        <FAQs items={filtered} />
-        {!filtered.length && (
-          <p>
-            No answers match that search. Try “payments”, “studio” or{' '}
-            <Link to="/contact">contact the team</Link>.
-          </p>
-        )}
-        <div className="help-contact">
-          <Mail />
-          <h2>Better with a human?</h2>
-          <p>Some things deserve a conversation.</p>
-          <Button asChild variant="dark">
-            <Link to="/contact">
-              Talk to Venue <ArrowUpRight size={17} />
-            </Link>
-          </Button>
-        </div>
+        <FAQs
+          items={faqs.filter((f) => (f.q + f.a).toLowerCase().includes(search.toLowerCase()))}
+        />
+        <Button asChild variant="dark">
+          <Link to="/contact">
+            Talk to us
+            <ArrowUpRight size={17} />
+          </Link>
+        </Button>
       </section>
-      <CTA />
     </>
   );
 }
-const contactSchema = z.object({
-  name: z.string().trim().min(2, 'Please enter your name').max(100),
-  email: z.email('Please enter a valid email'),
-  type: z.enum(['Artist support', 'Studio support', 'Pricing & plans', 'Something else']),
-  studio: z.string().max(150),
-  message: z.string().trim().min(15, 'Tell us a little more (at least 15 characters)').max(3000),
-});
-type ContactValues = z.infer<typeof contactSchema>;
 export function Contact() {
-  const [draft, setDraft] = useState('');
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<ContactValues>({
-    resolver: zodResolver(contactSchema),
-    defaultValues: { type: 'Artist support', studio: '' },
-  });
+  const session = useSession();
+  const refresh = useRefresh();
+  const [busy, setBusy] = useState(false);
+  const [reference, setReference] = useState('');
+  const [error, setError] = useState('');
   return (
     <>
       <PageIntro
-        label="REAL PEOPLE. REAL CONVERSATIONS."
-        title="Talk to a human."
-        text="A question about your books, your studio, or something in between? The Venue team is an email away."
+        label="LET’S TALK"
+        title="Good things start with a hello."
+        text="A question about your account, your studio or your next booking? Send it our way."
       />
-      <section className="container contact-grid">
+      <section className="container contact-layout">
         <Reveal>
-          <Label>LET’S START HERE</Label>
-          <h2>
-            A little context
-            <br />
-            goes a long way.
-          </h2>
+          <Photo name="studio-vintage" alt="Tattoo studio interior" />
+          <h2>A place for the conversation.</h2>
           <p>
-            This form prepares an email in your own mail app. Your message is sent only when you
-            choose to send it there.
+            Booking-specific questions stay with your appointment in the workspace. For everything
+            else, reach the Venue team here.
           </p>
-          <a className="contact-email" href={`mailto:${links.contact}`}>
-            {links.contact} <ArrowUpRight size={20} />
-          </a>
-          <p className="fine-print">
-            Support address verified in Venue’s official artist terms. This preview has no email
-            delivery provider configured.
-          </p>
-          <Photo name="tools-workstation" alt="Tattoo tools carefully arranged in a studio" />
+          <Link className="arrow-link" to="/dashboard">
+            Open my workspace
+            <ArrowUpRight size={17} />
+          </Link>
         </Reveal>
-        <form
-          className="contact-form"
-          onSubmit={handleSubmit((v) => {
-            const body = `Name: ${v.name}\nReply email: ${v.email}\nStudio: ${v.studio || 'Not specified'}\n\n${v.message}`;
-            setDraft(
-              `mailto:${links.contact}?subject=${encodeURIComponent(v.type + ' enquiry')}&body=${encodeURIComponent(body)}`,
-            );
-            toast('Email draft prepared. Open your mail app to send it.');
-          })}
-        >
-          <div className="form-grid">
+        {reference ? (
+          <div className="contact-success" role="status">
+            <CheckCircle size={40} />
+            <h2>We have your message.</h2>
+            <p>
+              Your reference is <strong>{reference}</strong>.
+            </p>
+            <p>
+              {session.data
+                ? 'Track the response in the Support section of your workspace.'
+                : 'Keep your reference. Sign in before sending future messages to follow their replies in your workspace.'}
+            </p>
+            <Button onClick={() => setReference('')}>Send another message</Button>
+          </div>
+        ) : (
+          <form
+            className="platform-form"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const form = new FormData(e.currentTarget);
+              setBusy(true);
+              setError('');
+              try {
+                const result = await request<{ request: { reference: string } }>('/contact', {
+                  method: 'POST',
+                  body: JSON.stringify(Object.fromEntries(form)),
+                });
+                setReference(result.request.reference);
+                refresh();
+              } catch (err) {
+                setError((err as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
             <label>
               Your name
               <input
-                {...register('name')}
-                autoComplete="name"
-                aria-invalid={!!errors.name}
-                aria-describedby="contact-name-error"
+                name="name"
+                required
+                minLength={2}
+                maxLength={100}
+                defaultValue={session.data?.name}
               />
-              {errors.name && (
-                <span className="field-error" id="contact-name-error">
-                  {errors.name.message}
-                </span>
-              )}
             </label>
             <label>
               Email address
               <input
-                {...register('email')}
+                name="email"
                 type="email"
-                autoComplete="email"
-                aria-invalid={!!errors.email}
-                aria-describedby="contact-email-error"
+                required
+                maxLength={254}
+                defaultValue={session.data?.email}
               />
-              {errors.email && (
-                <span className="field-error" id="contact-email-error">
-                  {errors.email.message}
-                </span>
-              )}
             </label>
-          </div>
-          <label>
-            What’s it about?
-            <select {...register('type')}>
-              {['Artist support', 'Studio support', 'Pricing & plans', 'Something else'].map(
-                (t) => (
-                  <option key={t}>{t}</option>
-                ),
-              )}
-            </select>
-          </label>
-          <label>
-            Studio or artist name <small>(optional)</small>
-            <input {...register('studio')} autoComplete="organization" />
-          </label>
-          <label>
-            A little about your question
-            <textarea
-              {...register('message')}
-              rows={6}
-              aria-invalid={!!errors.message}
-              aria-describedby="contact-message-error"
-              placeholder="Give us the details…"
-            />
-            {errors.message && (
-              <span className="field-error" id="contact-message-error">
-                {errors.message.message}
-              </span>
+            <label>
+              What’s on your mind?
+              <select name="category">
+                <option>General enquiry</option>
+                <option>Account support</option>
+                <option>Studio setup</option>
+                <option>Booking question</option>
+                <option>Payment enquiry</option>
+                <option>Privacy request</option>
+              </select>
+            </label>
+            <label>
+              Studio name (optional)
+              <input name="studioName" maxLength={150} />
+            </label>
+            <label>
+              Your message
+              <textarea name="message" required minLength={15} maxLength={3000} rows={6} />
+            </label>
+            <p>
+              By sending, you agree that Venue can use these details to respond.{' '}
+              <Link to="/privacy">Privacy notice</Link>
+            </p>
+            {error && (
+              <p className="form-error" role="alert">
+                {error}
+              </p>
             )}
-          </label>
-          <p className="fine-print">
-            Please don’t include payment details, private client records or medical information.
-          </p>
-          <Button type="submit" variant="dark">
-            Prepare my email <ArrowUpRight size={18} />
-          </Button>
-          {draft && (
-            <div className="email-ready" role="status">
-              <Mail />
-              <div>
-                <strong>Your draft is ready.</strong>
-                <p>No message has been sent.</p>
-                <a href={draft}>Open in my email app ↗</a>
-              </div>
-            </div>
-          )}
-        </form>
+            <Button variant="dark" disabled={busy}>
+              {busy ? 'Sending your message…' : 'Send my message'}
+              <ArrowUpRight size={17} />
+            </Button>
+          </form>
+        )}
       </section>
-      <CTA />
     </>
   );
 }
@@ -360,94 +277,49 @@ export function GetStarted() {
   return (
     <>
       <PageIntro
-        label="A LITTLE MORE SPACE STARTS HERE"
-        title="Find your Venue."
-        text="For your books, your creative collective, or your next idea. Choose where you want to go."
+        label="FIND YOUR SPACE"
+        title="A Venue for your next chapter."
+        text="Choose the way you work. Your account keeps the practical details together."
       />
-      <section className="container onboarding-grid">
+      <section className="container role-grid">
         {[
           {
-            title: 'I’m an artist.',
-            description: 'Give your books a home and your work some headspace.',
-            photo: 'artist-portrait-man',
-            url: links.signup,
-            cta: 'Set up with Venue',
+            role: 'client',
+            title: 'I’m here for the art.',
+            text: 'Find an artist, share your idea and follow your appointments.',
+            image: 'tattoo-hands',
           },
           {
-            title: 'I run a studio.',
-            description: 'Bring your people, calendars and requests together.',
-            photo: 'studio-interior',
-            url: links.signup,
-            cta: 'Start a studio account',
+            role: 'artist',
+            title: 'I make my own mark.',
+            text: 'Publish your artist page, open your books and manage your work.',
+            image: 'artist-studio-portrait',
           },
           {
-            title: 'I’m just exploring.',
-            description: 'Try the calendar and booking example. No account needed.',
-            photo: 'studio-community',
-            url: '/demo',
-            cta: 'Take a look around',
+            role: 'studio',
+            title: 'We create together.',
+            text: 'Manage studio services, invite artists and see the team’s calendar.',
+            image: 'studio-community',
           },
-        ].map((item, i) => (
-          <Reveal className="onboarding-card" delay={i * 0.1} key={item.title}>
-            <Photo name={item.photo} alt={item.description} />
-            <div>
-              <h2>{item.title}</h2>
-              <p>{item.description}</p>
-              <Button asChild variant="dark">
-                {item.url.startsWith('/') ? (
-                  <Link to={item.url}>
-                    {item.cta}
-                    <ArrowUpRight size={17} />
-                  </Link>
-                ) : (
-                  <a href={item.url}>
-                    {item.cta}
-                    <ArrowUpRight size={17} />
-                  </a>
-                )}
-              </Button>
-            </div>
+        ].map((item) => (
+          <Reveal key={item.role}>
+            <Link to={'/register?role=' + item.role} className="role-card">
+              <Photo name={item.image} alt={item.title} />
+              <div>
+                <h2>{item.title}</h2>
+                <p>{item.text}</p>
+                <span className="arrow-link">
+                  Create my account
+                  <ArrowUpRight />
+                </span>
+              </div>
+            </Link>
           </Reveal>
         ))}
       </section>
-      <p className="container fine-print onboarding-note">
-        Real accounts open the official Venue sign-up. This independent redesign does not connect to
-        existing Venue credentials.
+      <p className="container centered">
+        Already have your space? <Link to="/login">Sign in to Venue.</Link>
       </p>
-      <CTA title="A little less waiting. A lot more creating." />
-    </>
-  );
-}
-export function Demo() {
-  const [booking, setBooking] = useState(false);
-  return (
-    <>
-      <PageIntro
-        label="A LITTLE HANDS-ON"
-        title="Take the artist’s seat."
-        text="Create an example request, approve it, explore the calendar and try a conversation. Everything stays in your browser."
-      />
-      <section className="container full-demo">
-        <div className="demo-page-controls">
-          <p>
-            Illustrative artists and requests. No messages, appointments or payments leave this
-            demo.
-          </p>
-          <Button variant="dark" onClick={() => setBooking(true)}>
-            Create an example booking <ArrowUpRight size={17} />
-          </Button>
-        </div>
-        <StudioDemo />
-        <div className="demo-next">
-          <h2>Ready for your real books?</h2>
-          <Button asChild>
-            <a href={links.signup}>
-              Open the official Venue app <ArrowUpRight size={18} />
-            </a>
-          </Button>
-        </div>
-      </section>
-      <BookingWizard open={booking} onOpenChange={setBooking} />
     </>
   );
 }
@@ -457,12 +329,12 @@ export function Credits() {
       <PageIntro
         label="THE PEOPLE BEHIND THE PICTURES"
         title="Real work. Real credit."
-        text="Photography gives this experience its character. These images are licensed from Pexels and used as editorial stock, with no implied Venue affiliation."
+        text="Photography gives this experience its character. These images are licensed from Pexels and used as editorial photography, with no implied artist affiliation."
       />
       <section className="container credits-grid">
         {manifest.map((item) => (
           <article key={item.id}>
-            <Photo name={item.filename.replace('.webp', '')} alt={item.alt} />
+            <Photo name={item.id} alt={item.alt} />
             <h2>{item.photographer}</h2>
             <p>{item.alt}</p>
             <div>
@@ -479,22 +351,98 @@ export function Credits() {
     </>
   );
 }
+export function Legal() {
+  const { pathname } = useLocation();
+  const privacy = pathname === '/privacy';
+  const booking = pathname === '/booking-terms';
+  return (
+    <>
+      <PageIntro
+        label="THE DETAILS, IN PLAIN ENGLISH"
+        title={
+          privacy
+            ? 'Your information. Your trust.'
+            : booking
+              ? 'Before your appointment.'
+              : 'Using your Venue.'
+        }
+        text="The practical details for using this platform."
+      />
+      <article className="article-body">
+        {privacy ? (
+          <>
+            <h2>Information stored</h2>
+            <p>
+              Your account name, email, protected password, booking details, reference images,
+              messages, payment enquiries and support requests are stored to provide the service.
+              Account cookies keep you signed in. This site uses local fonts and does not add
+              advertising trackers.
+            </p>
+            <h2>Access and requests</h2>
+            <p>
+              Your artist, studio and administrators can access information needed to manage your
+              appointment. Uploaded artist artwork and profile images become public when published.
+              Contact support to request access, correction or deletion; records needed for a
+              dispute or payment may need to be retained.
+            </p>
+            <h2>Email enquiries</h2>
+            <p>
+              Opening an email payment enquiry passes the message to your chosen mail application
+              and email provider. Do not include payment credentials or sensitive financial details
+              in messages.
+            </p>
+          </>
+        ) : (
+          <>
+            <h2>{booking ? 'A request comes first' : 'Your account and content'}</h2>
+            <p>
+              {booking
+                ? 'Sending a request does not confirm an appointment. Your artist reviews the idea, time and scope before confirming. Pending requests can share a time; confirmed appointments reserve it.'
+                : 'Use accurate contact details, keep your password private and upload only material you have permission to use. Artists and studios are responsible for their published services, availability and artwork.'}
+            </p>
+            <h2>Quotes and payments</h2>
+            <p>
+              A service or artwork may require an individual quote. Your booking shows the quote and
+              deposit when set by the artist. Checkout saves your selected payment method and opens
+              a prefilled email to arrange payment. Sending that email does not mark the booking
+              paid. A received payment is recorded only after verification.
+            </p>
+            <h2>Changes and cancellation</h2>
+            <p>
+              Use your booking conversation to discuss changes, preparation and artist-specific
+              cancellation or deposit conditions before paying. You can cancel an open request in
+              your workspace. Cancelling does not automatically refund money; contact the studio
+              about payments already received.
+            </p>
+            <h2>Before attending</h2>
+            <p>
+              Confirm age requirements, suitability, identification, preparation and aftercare
+              directly with your artist.
+            </p>
+          </>
+        )}
+        <Link className="arrow-link" to="/contact">
+          Contact Venue
+          <ArrowUpRight size={17} />
+        </Link>
+      </article>
+    </>
+  );
+}
 export function NotFound() {
   return (
     <section className="not-found container">
       <Label>THIS PAGE WENT OFF SCRIPT</Label>
-      <span className="error-number">
-        404<span>✳</span>
-      </span>
+      <span className="error-number">404</span>
       <h1>
         A little lost?
         <br />
         Let’s get you back.
       </h1>
-      <p>The page you’re looking for isn’t here. Your next good idea might be.</p>
       <Button asChild variant="dark">
         <Link to="/">
-          Back to Venue <ArrowUpRight size={19} />
+          Back to Venue
+          <ArrowUpRight size={19} />
         </Link>
       </Button>
     </section>

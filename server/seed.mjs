@@ -13,6 +13,7 @@ export async function seedDatabase(
         (email || 'admin@venue.com').toLowerCase(),
       ])
     ).rows[0];
+    const adminCreated=!admin;
     if (!admin) {
       if (!email || !password)
         throw new Error('SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD are required for initial setup');
@@ -29,6 +30,7 @@ export async function seedDatabase(
       throw new Error('The configured administrator email already belongs to another account');
     let studio = (await db.query("SELECT id FROM venue_app.studios WHERE slug='venue-studio'"))
       .rows[0];
+    const studioCreated=!studio;
     if (!studio)
       studio = (
         await db.query(
@@ -88,7 +90,7 @@ export async function seedDatabase(
           [randomUUID(), studio.id, name, description, category, duration],
         );
     }
-    for (const weekday of [1, 2, 3, 4, 5, 6])
+    for (const weekday of studioCreated?[1, 2, 3, 4, 5, 6]:[])
       await db.query(
         'INSERT INTO venue_app.availability(id,artist_id,weekday,start_time,end_time) VALUES($1,$2,$3,$4,$5) ON CONFLICT(artist_id,weekday) DO NOTHING',
         [randomUUID(), admin.id, weekday, '10:00', weekday === 6 ? '16:00' : '18:00'],
@@ -107,6 +109,6 @@ export async function seedDatabase(
           'Venue Editorial',
         ],
       );
-    return { adminCreated: !!admin, studioId: studio.id, articles: editorial.length };
+    return { adminCreated, studioId: studio.id, articles: editorial.length };
   });
 }

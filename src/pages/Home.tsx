@@ -24,8 +24,8 @@ import { BookingWizard } from '../features/booking/BookingFlow';
 import { faqs } from '../data/site';
 export default function Home() {
   const hero = useRef(null);
-  const journal=useApi<{articles:ArticleData[]}>('/articles');
-  const articles=journal.data?.articles||[];
+  const journal = useApi<{ articles: ArticleData[] }>('/articles');
+  const articles = journal.data?.articles || [];
   const { scrollYProgress } = useScroll({
     target: hero,
     offset: ['start start', 'end start'],
@@ -320,9 +320,7 @@ export default function Home() {
               </Link>
             </Reveal>
           </div>
-          <p className="image-context">
-            An editorial look at line, form and the craft.
-          </p>
+          <p className="image-context">An editorial look at line, form and the craft.</p>
         </div>
       </section>
       <section className="studio-section container">
@@ -340,7 +338,7 @@ export default function Home() {
           <div className="tag-list">
             <span>Team calendars</span>
             <span>Guest artists</span>
-            <span>Request assignment</span>
+            <span>Artist availability</span>
           </div>
           <ArrowLink to="/studios">Meet Venue for studios</ArrowLink>
         </Reveal>
@@ -385,13 +383,25 @@ export default function Home() {
                   <br />
                   Make it a good one.
                 </h3>
-                <div className="phone-date">{new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}).toUpperCase()}</div>
-                <Link className="phone-appointment" to="/booking"><span className="status">YOUR NEXT CHAPTER</span><strong>Make your next mark.</strong><span>Find an artist. Share the idea.</span><i>Book a session ↗</i></Link>
-                <Link className="phone-appointment violet" to="/dashboard"><strong>Your work, together.</strong><span>Bookings. Conversations. Headspace.</span></Link>
+                <div className="phone-date">
+                  {new Date()
+                    .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+                    .toUpperCase()}
+                </div>
+                <Link className="phone-appointment" to="/booking">
+                  <span className="status">YOUR NEXT CHAPTER</span>
+                  <strong>Make your next mark.</strong>
+                  <span>Find an artist. Share the idea.</span>
+                  <i>Book a session ↗</i>
+                </Link>
+                <Link className="phone-appointment violet" to="/dashboard">
+                  <strong>Your work, together.</strong>
+                  <span>Bookings. Conversations. Headspace.</span>
+                </Link>
                 <nav>
-                  <CalendarDays />
-                  <MessageSquare />
-                  <Palette />
+                  <Link to="/dashboard?tab=calendar" aria-label="Open calendar"><CalendarDays /></Link>
+                  <Link to="/dashboard?tab=bookings" aria-label="Open booking conversations"><MessageSquare /></Link>
+                  <Link to="/flash" aria-label="Explore artwork"><Palette /></Link>
                 </nav>
               </div>
             </div>
@@ -407,7 +417,7 @@ export default function Home() {
             </h2>
             <p>
               At the studio. On a guest spot. On the sofa. Keep your books close and your options
-              open with Venue for iOS and Android.
+              open with Venue in your browser on iOS and Android.
             </p>
             <ArrowLink to="/info/mobile-app">Take Venue with you</ArrowLink>
           </Reveal>

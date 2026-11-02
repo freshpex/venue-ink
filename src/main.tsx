@@ -6,6 +6,7 @@ import { MotionConfig } from 'motion/react';
 import { Toaster } from 'sonner';
 import App from './App';
 import './styles.css';
+import './platform.css';
 const client = new QueryClient({
   defaultOptions: {
     queries: { staleTime: 30000, retry: 1, refetchOnWindowFocus: false },

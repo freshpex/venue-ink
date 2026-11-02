@@ -19,7 +19,7 @@ test('capture every major layout for desktop and mobile visual inspection', asyn
       '/pricing',
       '/journal',
       '/contact',
-      '/demo',
+      '/booking',
       '/info/mobile-app',
     ]) {
       await page.goto(route);
