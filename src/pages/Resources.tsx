@@ -386,11 +386,15 @@ export function Legal() {
               dispute or payment may need to be retained.
             </p>
             <h2>Email enquiries</h2>
-            <p>The optional live support widget is provided by Tawk.to. It may process your IP address, browser information, page visits and messages, and use cookies to maintain a support conversation. Share only the details needed for your enquiry. You can also contact Venue through the platform’s support form.</p>
             <p>
-              Opening an email payment enquiry passes the message to your chosen mail application
-              and email provider. Do not include payment credentials or sensitive financial details
-              in messages.
+              The optional live support widget is provided by Tawk.to. It may process your IP
+              address, browser information, page visits and messages, and use cookies to maintain a
+              support conversation. Share only the details needed for your enquiry. You can also
+              contact Venue through the platform’s support form.
+            </p>
+            <p>
+              When you contact us, your chosen communication service may process your message. Share
+              only the details needed for your enquiry.
             </p>
           </>
         ) : (
@@ -404,9 +408,8 @@ export function Legal() {
             <h2>Quotes and payments</h2>
             <p>
               A service or artwork may require an individual quote. Your booking shows the quote and
-              deposit when set by the artist. Checkout saves your selected payment method and opens
-              a prefilled email to arrange payment. Sending that email does not mark the booking
-              paid. A received payment is recorded only after verification.
+              deposit when set by the artist. Review the agreed amount before proceeding. A received
+              payment is recorded only after verification.
             </p>
             <h2>Changes and cancellation</h2>
             <p>

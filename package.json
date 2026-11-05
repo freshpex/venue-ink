@@ -44,7 +44,6 @@
     "react-hook-form": "^7.65.0",
     "react-router-dom": "^7.9.5",
     "sonner": "^2.0.7",
-    "stripe": "^23.1.0",
     "tailwind-merge": "^3.3.1",
     "zod": "^4.1.12",
     "zustand": "^5.0.8"

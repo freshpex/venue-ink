@@ -17,7 +17,6 @@ import { Loading, Failure, Empty } from '../components/AsyncState';
 import { useApi, useSession, useRefresh, dateTime, money } from '../lib/queries';
 import { request } from '../lib/api';
 import type { ProfileData } from '../features/workspace/AccountPanel';
-import { CardRefundForm } from '../features/payments/CardRefundForm';
 import type { Booking, Payment, Notification } from '../lib/types';
 import { AccountPanel, AvailabilityPanel } from '../features/workspace/AccountPanel';
 import {
@@ -208,12 +207,11 @@ function Overview() {
   );
 }
 function PaymentsPanel({ staff }: { staff: boolean }) {
-  const session = useSession();
   const query = useApi<{ payments: Payment[] }>('/payments');
   return (
     <section className="workspace-card">
       <h2>The payment picture.</h2>
-      <p>Email enquiries stay requested until the studio verifies receipt of funds.</p>
+      <p>Review your payment history and booking balances here.</p>
       {query.isPending ? (
         <Loading />
       ) : query.isError ? (
@@ -241,9 +239,6 @@ function PaymentsPanel({ staff }: { staff: boolean }) {
             {!!payment.refunded_cents && (
               <p>Refunded: {money(payment.refunded_cents, payment.currency)}</p>
             )}
-            {session.data?.role === 'admin' &&
-              payment.provider_payment_id &&
-              payment.status === 'received' && <CardRefundForm payment={payment} />}
             {staff && payment.status === 'requested' && (
               <SaveForm
                 fields={[

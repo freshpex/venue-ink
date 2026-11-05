@@ -102,7 +102,7 @@ export function OperationsPanel() {
       <section className="workspace-card">
         <h2>Email delivery queue</h2>
         {!o.mailConfigured && (
-          <p role="status">Email delivery is not configured. Pending messages remain queued.</p>
+          <p role="status">Email delivery is temporarily unavailable. Messages remain queued.</p>
         )}
         {deliveries.isPending ? (
           <Loading />

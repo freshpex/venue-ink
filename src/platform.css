@@ -1684,3 +1684,10 @@
   max-width: 650px;
   margin: 0 auto;
 }
+
+.payment-mail-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 16px 0;
+}

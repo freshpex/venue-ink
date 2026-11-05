@@ -185,8 +185,7 @@ export function SecurityPanel() {
           }
         />
         <p className="fine-print">
-          Security emails remain available when booking emails are turned off. Delivery requires a
-          configured email provider.
+          Turning off booking updates does not disable account recovery or verification.
         </p>
       </section>
       <section className="workspace-card">

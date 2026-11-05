@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
+import { paymentEmail } from '../content.mjs';
 import { pagination } from '../security.mjs';
 import { parse, id, email, timezone, articleInput, password, HttpError } from '../validation.mjs';
 import { transaction } from '../db.mjs';
@@ -400,7 +401,7 @@ export function adminRoutes(app, { pool }) {
       z
         .object({
           brandName: z.string().trim().min(2).max(80),
-          paymentEmail: email,
+          paymentEmail: z.literal(paymentEmail).optional(),
           currency: z.literal('USD'),
           timezone,
           bookingNotice: z.string().trim().min(10).max(500),
@@ -410,7 +411,7 @@ export function adminRoutes(app, { pool }) {
     );
     await pool.query(
       "UPDATE venue_app.settings SET brand_name=$1,payment_email=$2,currency=$3,timezone=$4,booking_notice=$5,updated_at=now() WHERE id='site'",
-      [v.brandName, v.paymentEmail, v.currency, v.timezone, v.bookingNotice],
+      [v.brandName, paymentEmail, v.currency, v.timezone, v.bookingNotice],
     );
     await audit(pool, req.user, 'settings.updated', 'site');
     res.json({ ok: true });

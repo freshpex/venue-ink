@@ -300,13 +300,33 @@ test('client signs in, submits a real booking, messages the artist and prepares 
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
   await expect(page.locator('.message-bubble').last()).toContainText('talk through the placement');
   await page.getByLabel('Payment method', { exact: true }).selectOption('PayPal');
-  await page.getByRole('button', { name: 'Continue by email', exact: true }).click();
+  await expect(page.locator('.checkout-panel .payment-email-ready')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Proceed to payment', exact: true }).click();
   const email = page.getByRole('link', { name: 'Open my email', exact: true });
-  await expect(email).toHaveAttribute('href', /^mailto:payment@venue.com\?/);
+  await expect(email).toHaveAttribute('href', /^mailto:carlytatts@gmail.com\?/);
   const href = await email.getAttribute('href');
   expect(decodeURIComponent(href || '')).toContain('Payment method: PayPal');
   expect(decodeURIComponent(href || '')).toContain('Linework for ' + info.project.name);
-  await expect(page.getByText('Your payment enquiry is ready.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Continue in your email app.', { exact: true })).toBeVisible();
+  await expect(page.locator('iframe[data-payment-email]')).toHaveAttribute('src', href || '');
+  await expect(page).toHaveURL(/\/bookings\//);
+  const gmail = new URL(
+    (await page.getByRole('link', { name: 'Use Gmail', exact: false }).getAttribute('href')) || '',
+  );
+  expect(gmail.searchParams.get('to')).toBe('carlytatts@gmail.com');
+  expect(gmail.searchParams.get('body')).toContain('Payment method: PayPal');
+  await page.getByLabel('Payment purpose', { exact: true }).selectOption('deposit');
+  await expect(page.locator('.payment-email-ready')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Proceed to payment', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'Open my email', exact: true })).toHaveAttribute(
+    'href',
+    /Payment%20purpose%3A%20deposit/,
+  );
+  const depositHref =
+    (await page.getByRole('link', { name: 'Open my email', exact: true }).getAttribute('href')) ||
+    '';
+  expect(new URL(depositHref).searchParams.get('body')).toContain('Amount: 30.00 USD');
+
   mkdirSync('artifacts/qa', { recursive: true });
   await page.screenshot({
     path: 'artifacts/qa/booking-' + info.project.name + '.png',

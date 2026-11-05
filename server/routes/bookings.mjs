@@ -13,7 +13,7 @@ import {
   notify,
   audit,
 } from '../domain.mjs';
-import { paymentMethods } from '../content.mjs';
+import { paymentMethods, paymentEmail } from '../content.mjs';
 export function bookingRoutes(app, { pool }) {
   app.get('/api/bookings', async (req, res) => {
     const scope = bookingScope(req.user);
@@ -203,18 +203,6 @@ export function bookingRoutes(app, { pool }) {
     );
     const result = await transaction(pool, async (db) => {
       const booking = await getBooking(db, bookingId, req.user, { lock: true });
-      if (
-        (
-          await db.query(
-            "SELECT id FROM venue_app.card_checkouts WHERE booking_id=$1 AND state IN ('creating','open') AND expires_at>now()",
-            [booking.id],
-          )
-        ).rowCount
-      )
-        throw new HttpError(
-          409,
-          'Cancel or finish the open card checkout before changing this booking.',
-        );
       const manager =
         req.user.role === 'admin' ||
         booking.artist_id === req.user.id ||
@@ -418,14 +406,45 @@ export function bookingRoutes(app, { pool }) {
         );
         await audit(db, req.user, 'payment.requested', paymentId, { method: values.method });
       }
-      const settings = (
-        await db.query("SELECT payment_email FROM venue_app.settings WHERE id='site'")
-      ).rows[0];
       const amountText =
         amount === null
           ? 'Please provide a quote'
-          : `${(amount / 100).toFixed(2)} ${booking.currency}`;
-      const details = `Hello Venue,\n\nI would like to arrange payment for the following booking.\n\nBooking reference: ${booking.reference}\nPayment reference: ${paymentId}\nPayment method: ${values.method}\nPayment purpose: ${values.purpose}\nAmount: ${amountText}\n\nService: ${booking.service_name}\nArtwork / request: ${booking.title}\nArtist: ${booking.artist_name}\nAppointment: ${new Date(booking.starts_at).toISOString()}\nClient: ${req.user.name}\nEmail: ${req.user.email}\n\nPlease send me the payment instructions and confirm the next steps.\nThank you.`;
+          : (amount / 100).toFixed(2) + ' ' + booking.currency;
+      const purposeLabel =
+        values.purpose === 'deposit' ? 'Booking deposit' : 'Remaining booking balance';
+      const appointment = new Intl.DateTimeFormat('en-GB', {
+        timeZone: booking.timezone || 'UTC',
+        dateStyle: 'full',
+        timeStyle: 'short',
+      }).format(new Date(booking.starts_at));
+      const subject = purposeLabel + ' · ' + booking.reference + ' · ' + values.method;
+      const lines = [
+        'Hello,',
+        '',
+        'I would like to arrange payment for the booking below.',
+        '',
+        'Booking reference: ' + booking.reference,
+        'Payment reference: ' + paymentId,
+        'Payment method: ' + values.method,
+        'Payment purpose: ' + values.purpose,
+        'Paying for: ' + purposeLabel,
+        'Amount: ' + amountText,
+        '',
+        'Service: ' + booking.service_name,
+        'Artwork / request: ' + booking.title,
+        'Artist: ' + booking.artist_name,
+        'Studio: ' + booking.studio_name,
+        'Appointment: ' + appointment + ' (' + (booking.timezone || 'UTC') + ')',
+        ...(booking.placement ? ['Placement: ' + booking.placement] : []),
+        ...(booking.size_note ? ['Size: ' + booking.size_note] : []),
+        '',
+        'Client: ' + req.user.name,
+        'Email: ' + req.user.email,
+        '',
+        'Please send the payment instructions for my selected method and confirm the next steps.',
+        'Thank you.',
+      ];
+      const details = lines.join('\n');
       return {
         payment: {
           id: paymentId,
@@ -434,9 +453,30 @@ export function bookingRoutes(app, { pool }) {
           currency: booking.currency,
           method: values.method,
         },
-        recipient: settings.payment_email,
+        recipient: paymentEmail,
+        subject,
+        webmail: {
+          gmail:
+            'https://mail.google.com/mail/?' +
+            new URLSearchParams({
+              view: 'cm',
+              fs: '1',
+              to: paymentEmail,
+              su: subject,
+              body: details,
+            }),
+          outlook:
+            'https://outlook.live.com/mail/0/deeplink/compose?' +
+            new URLSearchParams({ to: paymentEmail, subject, body: details }),
+        },
         details,
-        mailto: `mailto:${settings.payment_email}?subject=${encodeURIComponent(`Payment enquiry · ${booking.reference} · ${values.method}`)}&body=${encodeURIComponent(details)}`,
+        mailto:
+          'mailto:' +
+          paymentEmail +
+          '?subject=' +
+          encodeURIComponent(subject) +
+          '&body=' +
+          encodeURIComponent(details),
       };
     });
     res.status(201).json(output);
@@ -453,7 +493,7 @@ export function bookingRoutes(app, { pool }) {
     );
     const payments = (
       await pool.query(
-        `SELECT p.id,p.booking_id,p.user_id,p.method,p.purpose,p.amount_cents,p.currency,p.status,p.receipt_reference,p.created_at,p.received_at,p.provider_payment_id,(SELECT COALESCE(sum(r.amount_cents),0)::integer FROM venue_app.refunds r WHERE r.payment_id=p.id AND r.status='succeeded') AS refunded_cents,b.reference,b.title,u.name AS client_name,st.id AS studio_id,b.artist_id,st.owner_id AS studio_owner FROM venue_app.payment_requests p JOIN venue_app.bookings b ON b.id=p.booking_id JOIN venue_app.users u ON u.id=b.client_id JOIN venue_app.artist_profiles a ON a.user_id=b.artist_id LEFT JOIN venue_app.studios st ON st.id=a.studio_id WHERE ${scope.clause} ORDER BY p.created_at DESC LIMIT 200`,
+        `SELECT p.id,p.booking_id,p.user_id,p.method,p.purpose,p.amount_cents,p.currency,p.status,p.receipt_reference,p.created_at,p.received_at,(SELECT COALESCE(sum(r.amount_cents),0)::integer FROM venue_app.refunds r WHERE r.payment_id=p.id AND r.status='succeeded') AS refunded_cents,b.reference,b.title,u.name AS client_name,st.id AS studio_id,b.artist_id,st.owner_id AS studio_owner FROM venue_app.payment_requests p JOIN venue_app.bookings b ON b.id=p.booking_id JOIN venue_app.users u ON u.id=b.client_id JOIN venue_app.artist_profiles a ON a.user_id=b.artist_id LEFT JOIN venue_app.studios st ON st.id=a.studio_id WHERE ${scope.clause} ORDER BY p.created_at DESC LIMIT 200`,
         scope.params,
       )
     ).rows.map((p) => ({
@@ -495,18 +535,6 @@ export function bookingRoutes(app, { pool }) {
           [paymentId],
         )
       ).rows[0];
-      if (
-        (
-          await db.query(
-            "SELECT id FROM venue_app.card_checkouts WHERE booking_id=$1 AND state IN ('creating','open') AND expires_at>now()",
-            [booking.id],
-          )
-        ).rowCount
-      )
-        throw new HttpError(
-          409,
-          'Cancel or finish the open card checkout before recording manual payment.',
-        );
       if (payment.status !== 'requested')
         throw new HttpError(409, 'This payment request has already been processed.');
       const amount = values.amountCents ?? payment.amount_cents;

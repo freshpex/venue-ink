@@ -38,7 +38,7 @@ export const faqs = [
   },
   {
     q: 'How do payments work?',
-    a: 'Choose your payment method at checkout and continue by email. Your booking reference, selected method and payment details are filled in for you. The studio records a payment as received after verifying it.',
+    a: 'Your booking keeps your agreed quote, deposit and payment records together. You can review the details and follow your booking progress from your account.',
   },
   {
     q: 'Can I book a flash day?',
@@ -74,7 +74,7 @@ export const routeInfo: Record<string, { title: string; description: string }> =
       'Your link. Your world.',
       'Create a personal artist page and share your work.',
     ],
-    ['/payments', 'Keep the details together', 'Choose a payment method and coordinate by email.'],
+    ['/payments', 'Keep the details together', 'Flexible choices. Clear booking records.'],
     [
       '/pricing',
       'Clear prices. Good conversations.',

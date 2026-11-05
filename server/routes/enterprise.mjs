@@ -211,7 +211,11 @@ export function enterpriseRoutes(app, { pool }) {
         "SELECT last_run_at FROM venue_app.worker_heartbeats WHERE name='operations'",
       )
     ).rows[0];
-    const mailConfigured = !!(process.env.RESEND_API_KEY && process.env.MAIL_FROM);
+    const mailConfigured = !!(
+      process.env.MAILJET_API_KEY &&
+      process.env.MAILJET_SECRET_KEY &&
+      process.env.MAILJET_FROM_EMAIL
+    );
     res.json({
       mailConfigured,
       requireStaffMfa: app.locals.requireStaffMfa,
@@ -221,17 +225,11 @@ export function enterpriseRoutes(app, { pool }) {
       workerHealthy: !!heartbeat && Date.now() - new Date(heartbeat.last_run_at).getTime() < 120000,
       checks: [
         {
-          label: 'Organization SSO',
-          ready: !!app.locals.ssoEnabled,
-          detail:
-            'OIDC requires a trusted HTTPS issuer, client credentials and a registered callback URL. Only pre-provisioned accounts can sign in.',
-        },
-        {
           label: 'Transactional email',
           ready: mailConfigured,
           detail: mailConfigured
-            ? 'Provider configured; check delivery queue for failures.'
-            : 'Set RESEND_API_KEY and MAIL_FROM; queued messages are not being delivered.',
+            ? 'Check the delivery queue for updates.'
+            : 'Delivery is unavailable. Messages remain queued.',
         },
         {
           label: 'Staff MFA policy',
@@ -245,17 +243,9 @@ export function enterpriseRoutes(app, { pool }) {
             'Keep DATA_ENCRYPTION_KEY in the secret manager and preserve it across deployments.',
         },
         {
-          label: 'Payment processing',
-          ready: !!app.locals.cardPaymentsEnabled,
-          detail: app.locals.cardPaymentsEnabled
-            ? 'Hosted Stripe checkout configured. Review signed webhook delivery and reconcile receipts and refunds.'
-            : 'Manual payment verification is available. Set STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET to enable hosted card checkout.',
-        },
-        {
           label: 'Backups and restore',
           ready: false,
-          detail:
-            'Verify encrypted database backups and perform a restore drill using the operations runbook.',
+          detail: 'Verify encrypted database backups and perform a restore drill.',
         },
       ],
     });

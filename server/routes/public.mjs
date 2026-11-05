@@ -11,7 +11,7 @@ export function publicRoutes(app, { pool, writeLimiter }) {
         ['site'],
       )
     ).rows[0];
-    res.json({ settings, paymentMethods, cardPaymentsEnabled: !!app.locals.cardPaymentsEnabled });
+    res.json({ settings, paymentMethods });
   });
   app.get('/api/artists', async (_req, res) => {
     const artists = (

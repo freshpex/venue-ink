@@ -46,10 +46,10 @@ const configs: Record<
   '/payments': {
     label: 'THE BUSINESS SIDE, SIMPLIFIED',
     title: 'A smooth finish to great work.',
-    text: 'Choose your payment method and arrange the details with the team by email.',
+    text: 'Keep your quote, deposit and booking progress together.',
     photo: 'tattoo-machine-flatlay',
     heading: 'Clear next steps. One conversation.',
-    body: 'At checkout, select Western Union, MoneyGram, Bank Transfer, IBAN Bank Transfer, Apple Pay, PayPal, Apple iTunes or cryptocurrency. Venue saves your enquiry and opens a prefilled email to payment@venue.com with your chosen method and booking details. Your studio records payment after funds are verified.',
+    body: 'Your appointment, quote and payment records stay in one place, so you and your studio can keep every detail clear. Choose from flexible payment options and stay focused on the artwork ahead.',
   },
   '/services': {
     label: 'THE WHOLE STUDIO',
@@ -131,7 +131,7 @@ export default function Features() {
           {
             icon: Wallet,
             title: 'Know the next step.',
-            text: 'Arrange payments by email and track received funds against the agreed quote.',
+            text: 'Keep your agreed quote, deposit and payment records together.',
             path: '/payments',
           },
           {

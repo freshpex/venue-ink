@@ -17,7 +17,6 @@ For a production build, run `npm run build`. Set `NODE_ENV=production`, `CLIENT_
 - Booking requests with private references, timezone-aware slots, review, conflict-protected confirmation, rescheduling, cancellation and completion.
 - Persisted booking conversations, notifications, saved artwork and personal ideas.
 - Studio invitations, service management and event booking with capacity controls.
-- Checkout saves a payment enquiry and opens email to `payment@venue.com`. Methods: Western Union, MoneyGram, Bank Transfer, IBAN Bank Transfer, Apple Pay, PayPal, Apple iTunes and Cryptocurrency (BTC / ETH / USDT). Payment remains requested until staff verify receipt. No card or wallet credentials are collected.
 - Dedicated administration overview with platform counts, account creation for every role, named studio assignment, public artist name editing and publishing controls. Studio owners manage studios and teams; artist tools are shown to artists, with studio management available when they own a studio.
 - Support enquiries, admin replies, account restrictions/roles, journal publishing, settings and an activity log with readable record names.
 
@@ -30,11 +29,5 @@ Run `npm run format`, `npm run format:check`, `npm run lint`, `npm test`, `npm r
 ## Administration and enterprise operations
 
 Administrators use **Accounts & access → Create an account** for clients, artists, studio owners and administrators. Artists can join an existing studio or receive a new one. Studio owners receive a studio without becoming a bookable artist automatically. New admin-created profiles and studios start unpublished. Use Artists to review public names and open books, Studios to publish the studio and Services to set its menu. The artist sets working hours.
-
-The platform includes authenticator MFA and one-use recovery codes, revocable browser sessions, expiring password reset and email verification, organization OIDC sign-in for provisioned accounts, delegated studio permissions, an encrypted email outbox with retries and appointment reminders, optional Stripe-hosted checkout and signed receipt/refund webhooks, paginated account/booking/activity screens, financial reports and CSV export, account data export and privacy case management. Admin → Operations shows configuration and delivery status.
-
-Optional integrations remain disabled until configured. Production startup requires a stable DATA_ENCRYPTION_KEY; the Render blueprint enables mandatory staff MFA. Existing sessions must sign in again after the enterprise migration.
-
-See [operations and deployment](docs/OPERATIONS.md) for provider setup, tenant permission boundaries, monitoring, recovery, privacy, backup/restore and known limits. See [the implementation audit](docs/ENTERPRISE_AUDIT.md) for verified evidence and production acceptance gaps. These controls do not by themselves certify an enterprise deployment.
 
 Run `npm run test:local` for the API/security suites against disposable real PostgreSQL without using configured databases or providers. Run `npm run build`, then `npm run test:local -- --e2e --project=chromium` for browser workflows. CI executes those checks plus lint and a production dependency audit.

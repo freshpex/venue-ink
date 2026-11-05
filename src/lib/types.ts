@@ -104,7 +104,6 @@ export type ArticleData = {
 };
 export type Payment = {
   can_open_booking?: boolean;
-  provider_payment_id?: string | null;
   refunded_cents?: number;
   id: string;
   booking_id: string;

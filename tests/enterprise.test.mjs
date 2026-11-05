@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { fixture } from './helpers/platform.mjs';
 import { createApp } from '../server/app.mjs';
 import { unseal, totp } from '../server/security.mjs';
-import { runOperations, resendTransport } from '../server/mail.mjs';
+import { runOperations, mailjetTransport } from '../server/mail.mjs';
 let f, mfaAccount, recoveryCodes, resetToken;
 const origin = 'http://127.0.0.1:5173';
 beforeAll(async () => {
@@ -310,35 +310,50 @@ it('schedules notifications once, retries delivery with the same provider idempo
   const operations = await f.admin.get('/api/admin/operations');
   expect(operations.status).toBe(200);
   expect(operations.body.workerHealthy).toBe(true);
-  expect(operations.body.checks.some((c) => c.label === 'Payment processing' && !c.ready)).toBe(
-    true,
-  );
+  expect(operations.body.checks.some((c) => c.label === 'Organization SSO')).toBe(false);
 });
-it('sends provider requests with explicit idempotency and rejects unsuccessful responses', async () => {
+it('submits complete email messages and rejects transport or per-message failures', async () => {
   let observed;
-  await resendTransport(
-    { id: randomUUID(), to: 'recipient@venue.test', subject: 'Hello', text: 'A message' },
-    {
-      apiKey: 'test-key',
-      from: 'Venue <sender@venue.test>',
-      fetcher: async (url, options) => {
-        observed = { url, ...options };
-        return { ok: true };
-      },
+  const message = {
+    id: randomUUID(),
+    to: 'recipient@venue.test',
+    subject: 'Hello',
+    text: 'A message',
+  };
+  const options = {
+    apiKey: 'test-key',
+    secretKey: 'test-secret',
+    fromEmail: 'sender@venue.test',
+    fromName: 'Venue',
+  };
+  await mailjetTransport(message, {
+    ...options,
+    fetcher: async (url, request) => {
+      observed = { url, ...request };
+      return { ok: true, json: async () => ({ Messages: [{ Status: 'success' }] }) };
     },
+  });
+  expect(observed.url).toBe('https://api.mailjet.com/v3.1/send');
+  expect(observed.headers.Authorization).toBe(
+    'Basic ' + Buffer.from('test-key:test-secret').toString('base64'),
   );
-  expect(observed.headers['Idempotency-Key']).toBeTruthy();
-  expect(observed.url).toBe('https://api.resend.com/emails');
+  const payload = JSON.parse(observed.body).Messages[0];
+  expect(payload.From).toEqual({ Email: 'sender@venue.test', Name: 'Venue' });
+  expect(payload.To).toEqual([{ Email: message.to }]);
+  expect(payload.Subject).toBe(message.subject);
+  expect(payload.TextPart).toBe(message.text);
+  expect(payload.CustomID).toBe(message.id);
+  expect(payload.CustomCampaign).toBe(message.id);
+  expect(payload.DeduplicateCampaign).toBe(true);
   await expect(
-    resendTransport(
-      { id: randomUUID(), to: 'recipient@venue.test', subject: 'Hello', text: 'A message' },
-      {
-        apiKey: 'test-key',
-        from: 'sender@venue.test',
-        fetcher: async () => ({ ok: false, status: 429 }),
-      },
-    ),
+    mailjetTransport(message, { ...options, fetcher: async () => ({ ok: false, status: 429 }) }),
   ).rejects.toThrow('mail_http_429');
+  await expect(
+    mailjetTransport(message, {
+      ...options,
+      fetcher: async () => ({ ok: true, json: async () => ({ Messages: [{ Status: 'error' }] }) }),
+    }),
+  ).rejects.toThrow('mail_rejected');
 });
 
 it('persists sign-in throttling across application instances', async () => {

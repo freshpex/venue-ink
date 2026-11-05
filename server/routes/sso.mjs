@@ -54,7 +54,7 @@ export function ssoRoutes(
     maxAge: 5 * 60000,
   };
   app.get('/api/auth/sso/start', limiter, async (_req, res) => {
-    if (!provider) throw new HttpError(503, 'Organization sign-in is not configured.');
+    if (!provider) throw new HttpError(404, 'Page not found.');
     const state = randomBytes(32).toString('base64url');
     const verifier = oidc.randomPKCECodeVerifier(),
       nonce = oidc.randomNonce();
@@ -64,7 +64,7 @@ export function ssoRoutes(
     res.redirect(url);
   });
   app.get('/api/auth/sso/callback', limiter, async (req, res) => {
-    if (!provider) throw new HttpError(503, 'Organization sign-in is not configured.');
+    if (!provider) throw new HttpError(404, 'Page not found.');
     const encrypted = req.cookies.venue_sso_flow;
     res.clearCookie('venue_sso_flow', { ...cookie, maxAge: undefined });
     try {

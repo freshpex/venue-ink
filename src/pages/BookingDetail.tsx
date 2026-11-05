@@ -7,7 +7,6 @@ import { Loading, Failure } from '../components/AsyncState';
 import { useSession, useApi, useRefresh, dateTime, money, assetUrl } from '../lib/queries';
 import { request } from '../lib/api';
 import type { Booking, Asset, Message } from '../lib/types';
-import { RefundHistory } from '../features/payments/RefundHistory';
 import { CheckoutPanel } from '../features/payments/CheckoutPanel';
 import { SaveForm, str, cents } from '../features/workspace/Forms';
 export default function BookingDetail() {
@@ -49,7 +48,6 @@ export default function BookingDetail() {
         </div>
         <span className={'status status-' + b.status}>{b.status}</span>
       </div>
-      <RefundHistory bookingId={b.id} />
       <div className="workspace-columns">
         <div>
           <section className="workspace-card">

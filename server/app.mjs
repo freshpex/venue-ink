@@ -1,6 +1,4 @@
 import express from 'express';
-import Stripe from 'stripe';
-import { cardWebhook, cardRoutes } from './routes/cards.mjs';
 import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -36,10 +34,6 @@ export function createApp({
   encryptionKey = process.env.DATA_ENCRYPTION_KEY || secret,
   siteUrl = process.env.SITE_URL || origins[0],
   requireStaffMfa = process.env.REQUIRE_STAFF_MFA === 'true',
-  stripe = process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET
-    ? new Stripe(process.env.STRIPE_SECRET_KEY, { maxNetworkRetries: 2, timeout: 15000 })
-    : null,
-  webhookSecret = process.env.STRIPE_WEBHOOK_SECRET,
   logger = production ? (entry) => console.info(JSON.stringify(entry)) : () => {},
 }) {
   if (!secret || secret.length < 32)
@@ -92,7 +86,7 @@ export function createApp({
               ],
               connectSrc: ["'self'", ...origins, 'https://*.tawk.to', 'wss://*.tawk.to'],
               fontSrc: ["'self'", 'https://*.tawk.to', 'https://fonts.gstatic.com'],
-              frameSrc: ["'self'", 'https://*.tawk.to'],
+              frameSrc: ["'self'", 'mailto:', 'https://*.tawk.to'],
               formAction: ["'self'", 'https://*.tawk.to'],
               objectSrc: ["'none'"],
               frameAncestors: ["'none'"],
@@ -108,8 +102,6 @@ export function createApp({
       credentials: true,
     }),
   );
-  app.locals.cardPaymentsEnabled = !!stripe;
-  cardWebhook(app, { pool, stripe, webhookSecret });
   app.use(express.json({ limit: '9mb' }));
   app.use(cookieParser());
   app.use('/api', (_req, res, next) => {
@@ -409,7 +401,6 @@ export function createApp({
     next();
   });
   accessRoutes(app, { pool });
-  cardRoutes(app, { pool, stripe, siteUrl: app.locals.siteUrl });
   enterpriseRoutes(app, { pool });
   bookingRoutes(app, { pool });
   workspaceRoutes(app, { pool });

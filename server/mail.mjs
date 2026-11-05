@@ -14,20 +14,37 @@ export async function enqueueEmail(db, key, { userId, to, subject, text, dedupeK
     ],
   );
 }
-export async function resendTransport(message, { apiKey, from, fetcher = fetch, signal }) {
-  const response = await fetcher('https://api.resend.com/emails', {
+export async function mailjetTransport(
+  message,
+  { apiKey, secretKey, fromEmail, fromName = 'Venue', fetcher = fetch, signal },
+) {
+  const response = await fetcher('https://api.mailjet.com/v3.1/send', {
     method: 'POST',
     signal: signal
       ? AbortSignal.any([signal, AbortSignal.timeout(15000)])
       : AbortSignal.timeout(15000),
     headers: {
-      Authorization: 'Bearer ' + apiKey,
+      Authorization: 'Basic ' + Buffer.from(apiKey + ':' + secretKey).toString('base64'),
       'Content-Type': 'application/json',
-      'Idempotency-Key': message.id,
     },
-    body: JSON.stringify({ from, to: [message.to], subject: message.subject, text: message.text }),
+    body: JSON.stringify({
+      Messages: [
+        {
+          From: { Email: fromEmail, Name: fromName },
+          To: [{ Email: message.to }],
+          Subject: message.subject,
+          TextPart: message.text,
+          CustomID: message.id,
+          CustomCampaign: message.id,
+          DeduplicateCampaign: true,
+        },
+      ],
+    }),
   });
   if (!response.ok) throw new Error('mail_http_' + response.status);
+  const result = await response.json();
+  if (result.Messages?.length !== 1 || result.Messages[0].Status !== 'success')
+    throw new Error('mail_rejected');
 }
 export async function runOperations(pool, { key, siteUrl, transport, signal }) {
   await transaction(pool, async (db) => {

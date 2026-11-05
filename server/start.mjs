@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve, sep } from 'node:path';
 import { createPool, migrateDatabase } from './db.mjs';
 import { seedDatabase } from './seed.mjs';
-import { startOperations, resendTransport } from './mail.mjs';
+import { startOperations, mailjetTransport } from './mail.mjs';
 import { createApp } from './app.mjs';
 if (!process.env.DATABASE_URL || !process.env.JWT_SECRET) {
   console.error('DATABASE_URL and JWT_SECRET are required.');
@@ -82,11 +82,15 @@ const stopWorker =
         key: app.locals.encryptionKey,
         siteUrl: siteUrl.replace(/\/$/, ''),
         transport:
-          process.env.RESEND_API_KEY && process.env.MAIL_FROM
+          process.env.MAILJET_API_KEY &&
+          process.env.MAILJET_SECRET_KEY &&
+          process.env.MAILJET_FROM_EMAIL
             ? (message, options) =>
-                resendTransport(message, {
-                  apiKey: process.env.RESEND_API_KEY,
-                  from: process.env.MAIL_FROM,
+                mailjetTransport(message, {
+                  apiKey: process.env.MAILJET_API_KEY,
+                  secretKey: process.env.MAILJET_SECRET_KEY,
+                  fromEmail: process.env.MAILJET_FROM_EMAIL,
+                  fromName: process.env.MAILJET_FROM_NAME || 'Venue',
                   signal: options?.signal,
                 })
             : null,

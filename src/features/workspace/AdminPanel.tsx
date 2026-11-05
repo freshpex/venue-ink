@@ -523,13 +523,6 @@ export function SiteSettings() {
       <SaveForm
         fields={[
           { name: 'brand', label: 'Platform name', value: s.brand_name, required: true },
-          {
-            name: 'email',
-            label: 'Payment enquiry email',
-            type: 'email',
-            value: s.payment_email,
-            required: true,
-          },
           { name: 'timezone', label: 'Default time zone', value: s.timezone, required: true },
           {
             name: 'notice',
@@ -544,7 +537,6 @@ export function SiteSettings() {
             method: 'PUT',
             body: JSON.stringify({
               brandName: str(data, 'brand'),
-              paymentEmail: str(data, 'email'),
               currency: 'USD',
               timezone: str(data, 'timezone'),
               bookingNotice: str(data, 'notice'),
