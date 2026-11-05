@@ -96,8 +96,83 @@ const routes = [
   '/booking-terms',
   '/unknown-page',
 ];
-test('keyboard navigation opens menus and returns focus after booking',async({page})=>{await page.goto('/');await page.keyboard.press('Tab');await expect(page.getByRole('link',{name:'Skip to content'})).toBeFocused();await page.keyboard.press('Enter');await expect(page.locator('#main')).toBeFocused();const menu=page.getByRole('button',{name:'The good stuff',exact:true});await menu.focus();await page.keyboard.press('Space');await expect(menu).toHaveAttribute('aria-expanded','true');await page.keyboard.press('Escape');await expect(menu).toHaveAttribute('aria-expanded','false');const booking=page.getByRole('button',{name:'Book your next piece',exact:true});await booking.focus();await page.keyboard.press('Enter');await expect(page.getByRole('dialog')).toBeVisible();await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).not.toBeVisible();await expect(booking).toBeFocused();});
-test('registration, password changes and support replies persist in the account',async({page},info)=>{const email='qa-browser-'+crypto.randomUUID()+'@venue.test';const password='BrowserPassword42!';await page.goto('/register');await page.getByLabel('Your name',{exact:true}).fill('QA Browser client');await page.getByLabel('Email address',{exact:true}).fill(email);await page.getByLabel('Password',{exact:true}).fill(password);await page.getByLabel('I’m here as',{exact:true}).selectOption('client');const created=page.waitForResponse(r=>r.url().endsWith('/api/auth/register')&&r.request().method()==='POST');await page.getByRole('button',{name:'Create my account',exact:true}).click();const response=await created;expect(response.status()).toBe(201);f.users.push((await response.json()).user.id);await expect(page).toHaveURL(/\/dashboard/);await page.goto('/dashboard?tab=profile');await page.getByLabel('Current password',{exact:true}).fill(password);await page.getByLabel('New password',{exact:true}).fill(password+'New');const changed=page.waitForResponse(r=>r.url().endsWith('/api/auth/password')&&r.request().method()==='PATCH');await page.getByRole('button',{name:'Update password',exact:true}).click();expect((await changed).status()).toBe(200);await page.goto('/contact');await page.getByLabel('What’s on your mind?',{exact:true}).selectOption('Account support');await page.getByLabel('Your message',{exact:true}).fill('Please help me organize my account settings for '+info.project.name+'.');const support=page.waitForResponse(r=>r.url().endsWith('/api/contact')&&r.request().method()==='POST');await page.getByRole('button',{name:'Send my message',exact:true}).click();const saved=await support;expect(saved.status()).toBe(201);const record=(await saved.json()).request;f.supportRefs.push(record.reference);await expect(page.getByText('We have your message.',{exact:true})).toBeVisible();expect((await f.mutation(f.admin.patch('/api/admin/support/'+record.id)).send({status:'resolved',reply:'Your account is ready to use.'})).status).toBe(200);await page.goto('/dashboard?tab=support');await page.locator('summary').filter({hasText:record.reference}).click();await expect(page.getByText('Your account is ready to use.',{exact:true})).toBeVisible();await page.getByRole('button',{name:'Sign out',exact:true}).click();await expect(page).toHaveURL(/\/login/);await page.getByLabel('Email address',{exact:true}).fill(email);await page.getByLabel('Password',{exact:true}).fill(password+'New');await page.getByRole('button',{name:'Sign in',exact:true}).click();await expect(page).toHaveURL(/\/dashboard/);});
+test('keyboard navigation opens menus and returns focus after booking', async ({ page }) => {
+  await page.goto('/');
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('link', { name: 'Skip to content' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#main')).toBeFocused();
+  const menu = page.getByRole('button', { name: 'The good stuff', exact: true });
+  await menu.focus();
+  await page.keyboard.press('Space');
+  await expect(menu).toHaveAttribute('aria-expanded', 'true');
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveAttribute('aria-expanded', 'false');
+  const booking = page.getByRole('button', { name: 'Book your next piece', exact: true });
+  await booking.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).not.toBeVisible();
+  await expect(booking).toBeFocused();
+});
+test('registration, password changes and support replies persist in the account', async ({
+  page,
+}, info) => {
+  const email = 'qa-browser-' + crypto.randomUUID() + '@venue.test';
+  const password = 'BrowserPassword42!';
+  await page.goto('/register');
+  await page.getByLabel('Your name', { exact: true }).fill('QA Browser client');
+  await page.getByLabel('Email address', { exact: true }).fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByLabel('I’m here as', { exact: true }).selectOption('client');
+  const created = page.waitForResponse(
+    (r) => r.url().endsWith('/api/auth/register') && r.request().method() === 'POST',
+  );
+  await page.getByRole('button', { name: 'Create my account', exact: true }).click();
+  const response = await created;
+  expect(response.status()).toBe(201);
+  f.users.push((await response.json()).user.id);
+  await expect(page).toHaveURL(/\/dashboard/);
+  await page.goto('/dashboard?tab=profile');
+  await page.getByLabel('Current password', { exact: true }).fill(password);
+  await page.getByLabel('New password', { exact: true }).fill(password + 'New');
+  const changed = page.waitForResponse(
+    (r) => r.url().endsWith('/api/auth/password') && r.request().method() === 'PATCH',
+  );
+  await page.getByRole('button', { name: 'Update password', exact: true }).click();
+  expect((await changed).status()).toBe(200);
+  await page.goto('/contact');
+  await page.getByLabel('What’s on your mind?', { exact: true }).selectOption('Account support');
+  await page
+    .getByLabel('Your message', { exact: true })
+    .fill('Please help me organize my account settings for ' + info.project.name + '.');
+  const support = page.waitForResponse(
+    (r) => r.url().endsWith('/api/contact') && r.request().method() === 'POST',
+  );
+  await page.getByRole('button', { name: 'Send my message', exact: true }).click();
+  const saved = await support;
+  expect(saved.status()).toBe(201);
+  const record = (await saved.json()).request;
+  f.supportRefs.push(record.reference);
+  await expect(page.getByText('We have your message.', { exact: true })).toBeVisible();
+  expect(
+    (
+      await f
+        .mutation(f.admin.patch('/api/admin/support/' + record.id))
+        .send({ status: 'resolved', reply: 'Your account is ready to use.' })
+    ).status,
+  ).toBe(200);
+  await page.goto('/dashboard?tab=support');
+  await page.locator('summary').filter({ hasText: record.reference }).click();
+  await expect(page.getByText('Your account is ready to use.', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(page).toHaveURL(/\/login/);
+  await page.getByLabel('Email address', { exact: true }).fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(password + 'New');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+});
 test('all public routes load, images resolve and old destinations are absent', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -201,10 +276,10 @@ test('client signs in, submits a real booking, messages the artist and prepares 
   await expect(page.getByLabel('Password', { exact: true })).toHaveAttribute('type', 'text');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard/);
-  await page.goto('/booking?service='+f.service.id);
+  await page.goto('/booking?service=' + f.service.id);
   await page.getByRole('button', { name: 'Start my booking' }).click();
   const dialog = page.getByRole('dialog');
-  await expect(dialog.getByLabel('Service',{exact:true})).toHaveValue(f.service.id);
+  await expect(dialog.getByLabel('Service', { exact: true })).toHaveValue(f.service.id);
   await dialog.getByRole('button', { name: new RegExp('QA Artist') }).click();
   await dialog.getByLabel('Service', { exact: true }).selectOption(f.service.id);
   await dialog.getByRole('button', { name: 'Continue', exact: true }).click();
@@ -268,15 +343,15 @@ test('administrator controls and mobile workspace render actual records', async 
       'audit',
     ]) {
       const labels: Record<string, string> = {
-        overview: 'Overview',
-        bookings: 'Bookings & messages',
-        calendar: 'Calendar',
-        payments: 'Payments',
+        overview: 'Platform overview',
+        bookings: 'All bookings & messages',
+        calendar: 'Booking calendar',
+        payments: 'Payment verification',
         profile: 'My account',
         services: 'Services',
-        team: 'Team',
+        team: 'Teams & invitations',
         events: 'Events',
-        users: 'Accounts',
+        users: 'Accounts & access',
         inbox: 'Support inbox',
         journal: 'Journal',
         settings: 'Site settings',
@@ -296,7 +371,7 @@ test('administrator controls and mobile workspace render actual records', async 
     if (width !== 320) {
       await page
         .getByRole('navigation', { name: 'Workspace navigation' })
-        .getByRole('button', { name: 'Overview', exact: true })
+        .getByRole('button', { name: 'Platform overview', exact: true })
         .click();
       await page.screenshot({
         path: 'artifacts/qa/admin-' + width + '-' + info.project.name + '.png',

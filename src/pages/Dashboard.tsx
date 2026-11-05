@@ -7,6 +7,7 @@ import { Button } from '../components/ui/button';
 import { Loading, Failure, Empty } from '../components/AsyncState';
 import { useApi, useSession, useRefresh, dateTime, money } from '../lib/queries';
 import { request } from '../lib/api';
+import type { ProfileData } from '../features/workspace/AccountPanel';
 import type { Booking, Payment, Notification } from '../lib/types';
 import { AccountPanel, AvailabilityPanel } from '../features/workspace/AccountPanel';
 import {
@@ -17,6 +18,8 @@ import {
   EventsPanel,
 } from '../features/workspace/Management';
 import {
+  AdminOverview,
+  AdminArtists,
   UsersPanel,
   SupportPanel,
   ArticlesPanel,
@@ -89,7 +92,7 @@ function BookingList({ calendar = false }: { calendar?: boolean }) {
               <span>
                 <strong>{b.title}</strong>
                 <small>
-                  {b.reference} · {b.client_name} · {b.artist_name}
+                  {b.client_name} · {b.artist_name} · {b.studio_name}
                 </small>
                 <small>{dateTime(b.starts_at, b.timezone)}</small>
               </span>
@@ -282,6 +285,9 @@ function IdeasPanel() {
 }
 export default function Dashboard() {
   const session = useSession();
+  const workspace = useApi<ProfileData>('/profile', {
+    enabled: !!session.data && session.data.role !== 'client',
+  });
   const [params, setParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -301,41 +307,62 @@ export default function Dashboard() {
   const admin = user.role === 'admin';
   const staff = user.role !== 'client';
   if (location.pathname === '/admin' && !admin) return <Navigate to="/dashboard" replace />;
-  const tabs = [
-    ['overview', 'Overview'],
-    ['bookings', 'Bookings & messages'],
-    ['calendar', 'Calendar'],
-    ['payments', 'Payments'],
-    ['ideas', 'Ideas'],
-    ['support', 'Support'],
-    ['profile', 'My account'],
-    ...(staff
-      ? [
-          ['availability', 'Availability'],
-          ['artwork', 'Artwork'],
-          ['studio', 'Studio'],
-          ['services', 'Services'],
-          ['team', 'Team'],
-          ['events', 'Events'],
-        ]
-      : []),
-    ...(admin
-      ? [
-          ['users', 'Accounts'],
-          ['inbox', 'Support inbox'],
-          ['journal', 'Journal'],
-          ['settings', 'Site settings'],
-          ['audit', 'Activity log'],
-        ]
-      : []),
-  ];
+  const tabs = admin
+    ? [
+        ['overview', 'Platform overview'],
+        ['users', 'Accounts & access'],
+        ['artists', 'Artists'],
+        ['studio', 'Studios'],
+        ['services', 'Services'],
+        ['team', 'Teams & invitations'],
+        ['events', 'Events'],
+        ['bookings', 'All bookings & messages'],
+        ['calendar', 'Booking calendar'],
+        ['payments', 'Payment verification'],
+        ['inbox', 'Support inbox'],
+        ['journal', 'Journal'],
+        ['settings', 'Site settings'],
+        ['audit', 'Activity log'],
+        ['profile', 'My account'],
+      ]
+    : [
+        ['overview', 'Overview'],
+        ['bookings', 'Bookings & messages'],
+        ['calendar', 'Calendar'],
+        ['payments', 'Payments'],
+        ...(user.role === 'client' ? [['ideas', 'Ideas']] : []),
+        ...(user.role === 'artist'
+          ? [
+              ['availability', 'Availability'],
+              ['artwork', 'Artwork'],
+            ]
+          : []),
+        ...(workspace.data?.studios.length
+          ? [
+              ['studio', 'Studio'],
+              ['services', 'Services'],
+              ['team', 'Team'],
+              ['events', 'Events'],
+            ]
+          : []),
+        ['support', 'Support'],
+        ['profile', 'My account'],
+      ];
   const tab = tabs.some(([key]) => key === params.get('tab')) ? params.get('tab')! : 'overview';
   return (
     <section className="workspace-shell">
       <aside className="workspace-sidebar">
         <div className="workspace-brand">
           <PenTool size={22} />
-          <span>YOUR VENUE</span>
+          <span>
+            {admin
+              ? 'VENUE ADMIN'
+              : user.role === 'studio'
+                ? 'STUDIO WORKSPACE'
+                : user.role === 'artist'
+                  ? 'ARTIST WORKSPACE'
+                  : 'YOUR VENUE'}
+          </span>
         </div>
         <div className="workspace-user">
           <span className="avatar large">{user.name[0]}</span>
@@ -388,14 +415,18 @@ export default function Dashboard() {
             </h1>
           </div>
           <Button asChild variant="dark">
-            <Link to="/booking">
+            <Link to={admin ? '/admin?tab=users' : '/booking'}>
               <CalendarDays size={17} />
-              Make a booking
+              {admin ? 'Manage accounts' : 'Make a booking'}
             </Link>
           </Button>
         </div>
         {tab === 'overview' ? (
-          <Overview />
+          admin ? (
+            <AdminOverview />
+          ) : (
+            <Overview />
+          )
         ) : tab === 'bookings' ? (
           <BookingList />
         ) : tab === 'calendar' ? (
@@ -425,6 +456,8 @@ export default function Dashboard() {
           <TeamPanel />
         ) : tab === 'events' ? (
           <EventsPanel />
+        ) : tab === 'artists' ? (
+          <AdminArtists />
         ) : tab === 'users' ? (
           <UsersPanel />
         ) : tab === 'inbox' ? (

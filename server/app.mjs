@@ -14,7 +14,14 @@ import { publicRoutes } from './routes/public.mjs';
 import { bookingRoutes } from './routes/bookings.mjs';
 import { workspaceRoutes } from './routes/workspace.mjs';
 import { adminRoutes } from './routes/admin.mjs';
-export function createApp({ pool, secret, origins, production = false,securityHeaders=production, limit = 20 }) {
+export function createApp({
+  pool,
+  secret,
+  origins,
+  production = false,
+  securityHeaders = production,
+  limit = 20,
+}) {
   if (!secret || secret.length < 32)
     throw new Error('JWT_SECRET must contain at least 32 characters');
   const app = express();
@@ -185,10 +192,11 @@ export function createApp({ pool, secret, origins, production = false,securityHe
               ],
             );
           }
-          await db.query(
-            'INSERT INTO venue_app.artist_profiles(user_id,studio_id,slug,display_name) VALUES($1,$2,$3,$4)',
-            [user.id, studioId, `${slugify(values.name)}-${user.id.slice(0, 6)}`, values.name],
-          );
+          if (role === 'artist')
+            await db.query(
+              'INSERT INTO venue_app.artist_profiles(user_id,studio_id,slug,display_name) VALUES($1,$2,$3,$4)',
+              [user.id, studioId, `${slugify(values.name)}-${user.id.slice(0, 6)}`, values.name],
+            );
           if (invitation)
             await db.query('UPDATE venue_app.invitations SET accepted_at=now() WHERE id=$1', [
               invitation.id,

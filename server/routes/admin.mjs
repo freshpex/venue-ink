@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { parse, id, email, timezone, articleInput, HttpError } from '../validation.mjs';
+import bcrypt from 'bcryptjs';
+import { parse, id, email, timezone, articleInput, password, HttpError } from '../validation.mjs';
 import { transaction } from '../db.mjs';
 import { audit, notify, canManageStudio, isStaff } from '../domain.mjs';
 export function adminRoutes(app, { pool }) {
@@ -106,11 +107,131 @@ export function adminRoutes(app, { pool }) {
       ).rows,
     });
   });
+  const accountInput = z
+    .object({
+      name: z.string().trim().min(2).max(100),
+      email,
+      password,
+      role: z.enum(['admin', 'studio', 'artist', 'client']),
+      studioId: id.optional(),
+      studioName: z.string().trim().min(2).max(100).optional(),
+    })
+    .strict()
+    .superRefine((v, ctx) => {
+      if (v.studioId && v.role !== 'artist')
+        ctx.addIssue({ code: 'custom', message: 'Only artists can join an existing studio.' });
+      if (v.studioId && v.studioName)
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Choose an existing studio or enter a new studio name.',
+        });
+      if (v.studioName && !['artist', 'studio'].includes(v.role))
+        ctx.addIssue({
+          code: 'custom',
+          message: 'A studio name requires an artist or studio account.',
+        });
+    });
+  app.post('/api/admin/users', async (req, res) => {
+    const v = parse(accountInput, req.body);
+    const hash = await bcrypt.hash(v.password, 12);
+    try {
+      const user = await transaction(pool, async (db) => {
+        const userId = randomUUID();
+        const result = (
+          await db.query(
+            'INSERT INTO venue_app.users(id,name,email,password_hash,role) VALUES($1,$2,$3,$4,$5) RETURNING id,name,email,role,active,created_at',
+            [userId, v.name, v.email, hash, v.role],
+          )
+        ).rows[0];
+        if (v.role === 'artist' || v.role === 'studio') {
+          let studioId = v.studioId;
+          if (studioId) {
+            if (
+              !(
+                await db.query(
+                  "SELECT st.id FROM venue_app.studios st JOIN venue_app.users u ON u.id=st.owner_id WHERE st.id=$1 AND u.active=true AND u.role IN ('studio','artist','admin')",
+                  [studioId],
+                )
+              ).rowCount
+            )
+              throw new HttpError(400, 'Choose an active studio.');
+          } else {
+            studioId = randomUUID();
+            const zone =
+              (await db.query("SELECT timezone FROM venue_app.settings WHERE id='site'")).rows[0]
+                ?.timezone || 'UTC';
+            await db.query(
+              'INSERT INTO venue_app.studios(id,owner_id,name,slug,timezone,published) VALUES($1,$2,$3,$4,$5,false)',
+              [studioId, userId, v.studioName || v.name + ' Studio', 'studio-' + studioId, zone],
+            );
+          }
+          // A studio owner manages the team; only artists get a bookable profile.
+          if (v.role === 'artist')
+            await db.query(
+              'INSERT INTO venue_app.artist_profiles(user_id,studio_id,slug,display_name,published,books_open) VALUES($1,$2,$3,$4,false,false)',
+              [userId, studioId, 'artist-' + userId, v.name],
+            );
+        }
+        await audit(db, req.user, 'account.created', userId, { name: v.name, role: v.role });
+        return result;
+      });
+      res.status(201).json({ user });
+    } catch (error) {
+      if (error.code === '23505')
+        throw new HttpError(409, 'An account already uses that email address.');
+      throw error;
+    }
+  });
+  app.get('/api/admin/artists', async (_req, res) => {
+    res.json({
+      artists: (
+        await pool.query(
+          'SELECT a.user_id AS id,a.display_name,a.studio_id,a.published,a.books_open,u.name,u.email,u.role,u.active,st.name AS studio_name FROM venue_app.artist_profiles a JOIN venue_app.users u ON u.id=a.user_id LEFT JOIN venue_app.studios st ON st.id=a.studio_id ORDER BY a.display_name',
+        )
+      ).rows,
+    });
+  });
+  app.patch('/api/admin/artists/:id', async (req, res) => {
+    const userId = parse(id, req.params.id);
+    const v = parse(
+      z
+        .object({
+          displayName: z.string().trim().min(2).max(100),
+          published: z.boolean(),
+          booksOpen: z.boolean(),
+        })
+        .strict(),
+      req.body,
+    );
+    await transaction(pool, async (db) => {
+      const user = (
+        await db.query('SELECT role,active FROM venue_app.users WHERE id=$1 FOR UPDATE', [userId])
+      ).rows[0];
+      if (!user) throw new HttpError(404, 'Account not found.');
+      if ((v.published || v.booksOpen) && (!user.active || user.role === 'client'))
+        throw new HttpError(
+          400,
+          'Restricted or client accounts cannot be published or accept bookings.',
+        );
+      const updated = await db.query(
+        'UPDATE venue_app.artist_profiles SET display_name=$1,published=$2,books_open=$3 WHERE user_id=$4 RETURNING user_id',
+        [v.displayName, v.published, v.booksOpen, userId],
+      );
+      if (!updated.rowCount) throw new HttpError(404, 'Artist profile not found.');
+      await audit(db, req.user, 'artist.updated', userId, {
+        name: v.displayName,
+        published: v.published,
+        booksOpen: v.booksOpen,
+      });
+    });
+    res.json({ ok: true });
+  });
   app.patch('/api/admin/users/:id', async (req, res) => {
     const userId = parse(id, req.params.id);
     const v = parse(
       z
         .object({
+          name: z.string().trim().min(2).max(100).optional(),
           role: z.enum(['admin', 'studio', 'artist', 'client']).optional(),
           active: z.boolean().optional(),
         })
@@ -139,34 +260,48 @@ export function adminRoutes(app, { pool }) {
         if (admins <= 1) throw new HttpError(400, 'Keep at least one active administrator.');
       }
       await db.query(
-        'UPDATE venue_app.users SET role=$1,active=$2,session_version=session_version+1,updated_at=now() WHERE id=$3',
-        [v.role || user.role, v.active ?? user.active, userId],
+        'UPDATE venue_app.users SET role=$1,active=$2,name=$4,session_version=session_version+CASE WHEN role<>$1 OR active<>$2 THEN 1 ELSE 0 END,updated_at=now() WHERE id=$3',
+        [v.role || user.role, v.active ?? user.active, userId, v.name || user.name],
       );
       const nextRole = v.role || user.role;
       if (
-        ['artist', 'studio', 'admin'].includes(nextRole) &&
-        !(await db.query('SELECT 1 FROM venue_app.artist_profiles WHERE user_id=$1', [userId]))
-          .rowCount
+        nextRole === 'studio' ||
+        (nextRole === 'artist' &&
+          !(await db.query('SELECT 1 FROM venue_app.artist_profiles WHERE user_id=$1', [userId]))
+            .rowCount)
       ) {
-        const studioId = randomUUID();
+        const ownedStudio = (
+          await db.query(
+            'SELECT id FROM venue_app.studios WHERE owner_id=$1 ORDER BY created_at LIMIT 1',
+            [userId],
+          )
+        ).rows[0];
+        const studioId = ownedStudio?.id || randomUUID();
         const slug = 'artist-' + userId.slice(0, 12);
-        await db.query('INSERT INTO venue_app.studios(id,owner_id,name,slug) VALUES($1,$2,$3,$4)', [
-          studioId,
-          userId,
-          user.name + ' Studio',
-          slug,
-        ]);
-        await db.query(
-          'INSERT INTO venue_app.artist_profiles(user_id,studio_id,slug,display_name) VALUES($1,$2,$3,$4)',
-          [userId, studioId, slug, user.name],
-        );
+        if (!ownedStudio)
+          await db.query(
+            'INSERT INTO venue_app.studios(id,owner_id,name,slug,published) VALUES($1,$2,$3,$4,false)',
+            [studioId, userId, user.name + ' Studio', slug],
+          );
+        if (nextRole === 'artist')
+          await db.query(
+            'INSERT INTO venue_app.artist_profiles(user_id,studio_id,slug,display_name,published,books_open) VALUES($1,$2,$3,$4,false,false)',
+            [userId, studioId, slug, v.name || user.name],
+          );
       }
-      if (nextRole === 'client' || v.active === false) {
+      if (
+        (v.role && nextRole !== user.role && nextRole !== 'artist') ||
+        nextRole === 'client' ||
+        v.active === false
+      ) {
         await db.query(
           'UPDATE venue_app.artist_profiles SET published=false,books_open=false WHERE user_id=$1',
           [userId],
         );
-        await db.query('UPDATE venue_app.studios SET published=false WHERE owner_id=$1', [userId]);
+        if (nextRole === 'client' || v.active === false)
+          await db.query('UPDATE venue_app.studios SET published=false WHERE owner_id=$1', [
+            userId,
+          ]);
       }
       await audit(db, req.user, 'account.updated', userId, v);
     });
@@ -273,7 +408,7 @@ export function adminRoutes(app, { pool }) {
     res.json({
       entries: (
         await pool.query(
-          'SELECT a.id,a.action,a.entity_id,a.details,a.created_at,u.name AS actor_name FROM venue_app.audit_logs a LEFT JOIN venue_app.users u ON u.id=a.actor_id ORDER BY a.created_at DESC LIMIT 200',
+          "SELECT a.id,a.action,a.entity_id,a.details,a.created_at,u.name AS actor_name,COALESCE((SELECT name FROM venue_app.users WHERE id::text=a.entity_id),(SELECT title FROM venue_app.bookings WHERE id::text=a.entity_id),(SELECT name FROM venue_app.studios WHERE id::text=a.entity_id),(SELECT title FROM venue_app.articles WHERE id::text=a.entity_id),(SELECT name FROM venue_app.support_requests WHERE id::text=a.entity_id),a.details->>'name',a.entity_id) AS entity_name FROM venue_app.audit_logs a LEFT JOIN venue_app.users u ON u.id=a.actor_id ORDER BY a.created_at DESC LIMIT 200",
         )
       ).rows,
     }),

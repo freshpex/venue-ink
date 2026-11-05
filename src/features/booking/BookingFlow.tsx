@@ -76,11 +76,19 @@ export function BookingWizard({
   );
   const abort = useRef<AbortController | null>(null);
   const submission = useRef<{ key: string; fingerprint: string } | null>(null);
-  const artists = (artistsQuery.data?.artists || []).filter(artist=>!(flashId||eventId)||!artistId||artist.id===artistId);
-  const preferredStudio=servicesQuery.data?.services.find(service=>service.id===serviceId)?.studio_id;
-  const selectedArtist = artists.find((a) => a.id === (artistChoice || artistId)) || (!artistChoice&&!artistId?artists.find(artist=>artist.studio_id===preferredStudio):undefined) || artists[0];
+  const artists = (artistsQuery.data?.artists || []).filter(
+    (artist) => artist.books_open && (!(flashId || eventId) || !artistId || artist.id === artistId),
+  );
+  const preferredStudio = servicesQuery.data?.services.find(
+    (service) => service.id === serviceId,
+  )?.studio_id;
+  const selectedArtist =
+    artistChoice || artistId
+      ? artists.find((a) => a.id === (artistChoice || artistId))
+      : artists.find((a) => a.studio_id === preferredStudio) || artists[0];
   const services = (servicesQuery.data?.services || []).filter(
-    (s) => s.studio_id === selectedArtist?.studio_id && (!eventId||!serviceId||s.id===serviceId),
+    (s) =>
+      s.studio_id === selectedArtist?.studio_id && (!eventId || !serviceId || s.id === serviceId),
   );
   const selectedService =
     services.find((s) => s.id === (serviceChoice || serviceId)) || services[0];
@@ -290,9 +298,12 @@ export function BookingWizard({
                 <Check size={34} />
               </span>
               <h3>Request received.</h3>
-              <p className="booking-reference">{done.reference}</p>
+              <p className="booking-reference">
+                {selectedService?.name} with {selectedArtist?.display_name}
+              </p>
+              <small>Booking reference: {done.reference}</small>
               <p>
-                {selectedArtist?.display_name}
+                {selectedArtist?.studio_name}
                 <br />
                 {dateTime(done.starts_at, selectedArtist?.timezone)}
               </p>
@@ -344,8 +355,14 @@ export function BookingWizard({
                           <Loading />
                         ) : artistsQuery.isError || servicesQuery.isError ? (
                           <Failure
-                            message={(artistsQuery.error||servicesQuery.error)?.message||'The service menu could not load.'}
-                            retry={() => {void artistsQuery.refetch();void servicesQuery.refetch();}}
+                            message={
+                              (artistsQuery.error || servicesQuery.error)?.message ||
+                              'The service menu could not load.'
+                            }
+                            retry={() => {
+                              void artistsQuery.refetch();
+                              void servicesQuery.refetch();
+                            }}
                           />
                         ) : (
                           <>
@@ -374,12 +391,16 @@ export function BookingWizard({
                               Service
                               <select
                                 aria-label="Service"
+                                disabled={!services.length}
                                 value={selectedService?.id || ''}
                                 onChange={(event) => {
                                   setServiceChoice(event.target.value);
                                   setTime('');
                                 }}
                               >
+                                {!services.length && (
+                                  <option value="">No services available for this artist</option>
+                                )}
                                 {services.map((service) => (
                                   <option value={service.id} key={service.id}>
                                     {service.name} · {service.duration_minutes} min
@@ -387,6 +408,12 @@ export function BookingWizard({
                                 ))}
                               </select>
                             </label>
+                            {selectedArtist && !services.length && (
+                              <p role="status">
+                                This studio has not published a service yet. Choose another artist
+                                or contact the studio.
+                              </p>
+                            )}
                             {selectedService && (
                               <p className="fine-print">
                                 {selectedService.description}
@@ -700,6 +727,13 @@ export function BookingWizard({
                     <Button
                       key="continue-booking"
                       type="button"
+                      disabled={
+                        step === 0 &&
+                        (!selectedArtist ||
+                          !selectedService ||
+                          artistsQuery.isPending ||
+                          servicesQuery.isPending)
+                      }
                       onClick={(event) => {
                         event.preventDefault();
                         void next();
