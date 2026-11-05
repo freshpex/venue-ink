@@ -385,7 +385,13 @@ export function Legal() {
               Contact support to request access, correction or deletion; records needed for a
               dispute or payment may need to be retained.
             </p>
-            <h2>Email enquiries</h2>
+            <h2>Your cookie choices</h2>
+            <p>
+              Essential cookies support sign-in and security. You can use every booking and account
+              feature with essential cookies only. Optional live-chat cookies stay off until you
+              accept them. Use Cookie settings in the footer to change your choice at any time.
+            </p>
+            <h2>Support and enquiries</h2>
             <p>
               The optional live support widget is provided by Tawk.to. It may process your IP
               address, browser information, page visits and messages, and use cookies to maintain a

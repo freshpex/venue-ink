@@ -25,7 +25,7 @@ it('does not accept a successful login response when the browser rejected its co
   const client = createVenueQueryClient();
   client.setQueryData(['api', '/profile'], { private: true });
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply(401, {})));
-  await expect(finishSignIn(client)).rejects.toThrow('sign-in could not be verified');
+  await expect(finishSignIn(client)).rejects.toThrow('sign-in could not be completed');
   expect(client.getQueryData(['session'])).toBeNull();
   expect(client.getQueryData(['api', '/profile'])).toBeUndefined();
   client.clear();

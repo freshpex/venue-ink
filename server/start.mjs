@@ -59,6 +59,11 @@ const app = createApp({
 let stopWorker = async () => {};
 const publicDirectory = fileURLToPath(new URL('../public', import.meta.url));
 const dist = fileURLToPath(new URL('../dist', import.meta.url));
+app.get('/venue-config.js', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  // A server-hosted build always uses its own API, including when build variables are stale.
+  res.type('application/javascript').send('window.__VENUE_CONFIG__={"apiBase":"","appOrigin":""};');
+});
 if ((production || process.env.SERVE_DIST === 'true') && existsSync(`${dist}/index.html`)) {
   app.get(/^(?!\/api(?:\/|$)).*/, (req, res, next) => {
     if (

@@ -13,6 +13,10 @@ services:
         value: 22.22.0
       - key: COOKIE_SAME_SITE
         value: lax
+      - key: VITE_API_URL
+        value: ''
+      - key: VITE_APP_ORIGIN
+        value: ''
       - key: JWT_SECRET
         generateValue: true
       - key: DATA_ENCRYPTION_KEY

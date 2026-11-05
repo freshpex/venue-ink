@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowUpRight, Eye, EyeOff, LoaderCircle, PenTool } from 'lucide-react';
 import { finishSignIn } from '../lib/session';
-import { request, waitForServer, apiBase } from '../lib/api';
+import { request, waitForServer, apiBase, ApiError } from '../lib/api';
 import { SaveForm, str } from '../features/workspace/Forms';
 import { useSession, useApi } from '../lib/queries';
 import type { User } from '../lib/types';
@@ -32,12 +32,14 @@ export function WorkspaceLogin() {
   const [visible, setVisible] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const [mfaRequired, setMfaRequired] = useState(false);
   const controller = useRef<AbortController | null>(null);
   const roleParam = params.get('role');
   const {
     register,
     handleSubmit,
     setError: fieldError,
+    resetField,
     formState: { errors, isSubmitting },
   } = useForm<Fields>({
     resolver: zodResolver(fields),
@@ -48,6 +50,11 @@ export function WorkspaceLogin() {
     },
   });
   useEffect(() => () => controller.current?.abort(), []);
+  useEffect(() => {
+    setMfaRequired(false);
+    setError('');
+    resetField('code');
+  }, [signup, resetField]);
   useEffect(() => {
     if (session.data) {
       const next = params.get('next');
@@ -81,11 +88,15 @@ export function WorkspaceLogin() {
       </div>
       <div className="auth-form-wrap">
         <span className="workspace-kicker">YOUR VENUE ACCOUNT</span>
-        <h1>{signup ? 'A fresh canvas.' : 'Welcome back.'}</h1>
+        <h1>
+          {signup ? 'A fresh canvas.' : mfaRequired ? 'Verify your sign-in.' : 'Welcome back.'}
+        </h1>
         <p>
           {signup
             ? 'Create your space for bookings, conversations and the work ahead.'
-            : 'Your books, your people and your next great piece. All right here.'}
+            : mfaRequired
+              ? 'Enter a code from your authenticator app, or use one of your recovery codes.'
+              : 'Your books, your people and your next great piece. All right here.'}
         </p>
         {params.get('sso') === 'error' && (
           <p role="alert" className="field-error">
@@ -154,7 +165,12 @@ export function WorkspaceLogin() {
                   { replace: true },
                 );
               } catch (error) {
-                if (!abort.signal.aborted) setError((error as Error).message);
+                if (!abort.signal.aborted) {
+                  if (!signup && error instanceof ApiError && error.status === 428) {
+                    setMfaRequired(true);
+                    resetField('code');
+                  } else setError((error as Error).message);
+                }
               } finally {
                 setStatus('');
               }
@@ -177,59 +193,66 @@ export function WorkspaceLogin() {
                 </label>
               </>
             )}
-            <label>
-              Email address
-              <input
-                {...register('email')}
-                type="email"
-                autoComplete="email"
-                aria-invalid={!!errors.email}
-                aria-describedby="auth-email-error"
-              />
-              {errors.email && (
-                <span className="field-error" id="auth-email-error">
-                  {errors.email.message}
-                </span>
-              )}
-            </label>
-            <label>
-              Password
-              <div className="password-field">
-                <input
-                  {...register('password')}
-                  aria-label="Password"
-                  type={visible ? 'text' : 'password'}
-                  autoComplete={signup ? 'new-password' : 'current-password'}
-                  aria-invalid={!!errors.password}
-                  aria-describedby="auth-password-error"
-                />
-                <button
-                  type="button"
-                  aria-label={visible ? 'Hide password' : 'Show password'}
-                  aria-pressed={visible}
-                  onClick={() => setVisible((value) => !value)}
-                >
-                  {visible ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-              </div>
-              {errors.password && (
-                <span className="field-error" id="auth-password-error">
-                  {errors.password.message}
-                </span>
-              )}
-            </label>
-            {!signup && (
+            {!mfaRequired && (
+              <>
+                <label>
+                  Email address
+                  <input
+                    {...register('email')}
+                    type="email"
+                    autoComplete="email"
+                    aria-invalid={!!errors.email}
+                    aria-describedby="auth-email-error"
+                  />
+                  {errors.email && (
+                    <span className="field-error" id="auth-email-error">
+                      {errors.email.message}
+                    </span>
+                  )}
+                </label>
+                <label>
+                  Password
+                  <div className="password-field">
+                    <input
+                      {...register('password')}
+                      aria-label="Password"
+                      type={visible ? 'text' : 'password'}
+                      autoComplete={signup ? 'new-password' : 'current-password'}
+                      aria-invalid={!!errors.password}
+                      aria-describedby="auth-password-error"
+                    />
+                    <button
+                      type="button"
+                      aria-label={visible ? 'Hide password' : 'Show password'}
+                      aria-pressed={visible}
+                      onClick={() => setVisible((value) => !value)}
+                    >
+                      {visible ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
+                  {errors.password && (
+                    <span className="field-error" id="auth-password-error">
+                      {errors.password.message}
+                    </span>
+                  )}
+                </label>
+              </>
+            )}
+            {mfaRequired && (
               <label>
                 Authenticator or recovery code
                 <input
                   {...register('code')}
                   autoComplete="one-time-code"
                   aria-label="Authenticator or recovery code"
+                  autoFocus
+                  required
+                  spellCheck={false}
+                  autoCapitalize="none"
                 />
-                <small>Enter a code if you enabled two-factor authentication.</small>
               </label>
             )}
-            {!signup && (
+            {!signup && !mfaRequired && (
               <Link className="password-help" to="/account-access">
                 Forgot your password?
               </Link>
@@ -247,11 +270,26 @@ export function WorkspaceLogin() {
                 </>
               ) : (
                 <>
-                  {signup ? 'Create my account' : 'Sign in'}
+                  {signup ? 'Create my account' : mfaRequired ? 'Verify and sign in' : 'Sign in'}
                   <ArrowUpRight size={18} />
                 </>
               )}
             </Button>
+            {mfaRequired && (
+              <button
+                type="button"
+                className="text-button"
+                disabled={isSubmitting}
+                onClick={() => {
+                  setMfaRequired(false);
+                  setError('');
+                  resetField('code');
+                  resetField('password');
+                }}
+              >
+                Use a different account
+              </button>
+            )}
             {isSubmitting && (
               <>
                 <p className="fine-print" role="status">
@@ -280,7 +318,7 @@ export function WorkspaceLogin() {
             )}
           </form>
         )}
-        {!signup && providers.data?.ssoEnabled && (
+        {!signup && !mfaRequired && providers.data?.ssoEnabled && (
           <Button asChild variant="outline">
             <a href={apiBase + '/api/auth/sso/start'}>Continue with organization SSO</a>
           </Button>

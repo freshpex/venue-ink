@@ -173,6 +173,7 @@ export function createApp({
   const writeLimiter = rateLimit({
     windowMs: 60000,
     limit: 90,
+    skip: (req) => ['GET', 'HEAD', 'OPTIONS'].includes(req.method),
     standardHeaders: 'draft-8',
     legacyHeaders: false,
     message: { message: 'Please wait a moment before making more changes.' },

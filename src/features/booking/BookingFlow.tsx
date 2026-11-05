@@ -11,7 +11,7 @@ import { Button } from '../../components/ui/button';
 import { Loading, Failure } from '../../components/AsyncState';
 import { useApi, useSession, useRefresh, dateTime, money } from '../../lib/queries';
 import { finishSignIn } from '../../lib/session';
-import { request, waitForServer } from '../../lib/api';
+import { request, waitForServer, ApiError } from '../../lib/api';
 import { uploadImage } from '../../lib/upload';
 import type { Artist, Service, User } from '../../lib/types';
 import { CheckoutPanel } from '../payments/CheckoutPanel';
@@ -73,6 +73,7 @@ export function BookingWizard({
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const [mfaRequired, setMfaRequired] = useState(false);
   const [done, setDone] = useState<{ id: string; reference: string; starts_at: string } | null>(
     null,
   );
@@ -126,6 +127,7 @@ export function BookingWizard({
   });
   useEffect(() => {
     if (open) {
+      setMfaRequired(false);
       setStep(0);
       setDone(null);
       setError('');
@@ -262,7 +264,11 @@ export function BookingWizard({
       void refresh();
       toast.success('Your booking request has been received');
     } catch (error) {
-      if (!controller.signal.aborted) setError((error as Error).message);
+      if (!controller.signal.aborted) {
+        if (error instanceof ApiError && error.status === 428) {
+          setMfaRequired(true);
+        } else setError((error as Error).message);
+      }
     } finally {
       setBusy(false);
       setStatus('');
@@ -668,12 +674,6 @@ export function BookingWizard({
                                 <span className="field-error">{errors.password.message}</span>
                               )}
                             </label>
-                            {!signup && (
-                              <label>
-                                Authenticator or recovery code
-                                <input {...register('code')} autoComplete="one-time-code" />
-                              </label>
-                            )}
                             <p className="fine-print">
                               Your account keeps your booking, reference images and artist
                               conversation together.
@@ -722,6 +722,23 @@ export function BookingWizard({
                           </span>
                         </label>
                         {errors.consent && <p className="field-error">{errors.consent.message}</p>}
+                        {mfaRequired && !session.data && (
+                          <div className="booking-verification">
+                            <h4>Verify your sign-in.</h4>
+                            <p>Enter an authenticator or recovery code to finish your booking.</p>
+                            <label>
+                              Authenticator or recovery code
+                              <input
+                                {...register('code')}
+                                autoComplete="one-time-code"
+                                required
+                                autoFocus
+                                spellCheck={false}
+                                autoCapitalize="none"
+                              />
+                            </label>
+                          </div>
+                        )}
                       </>
                     )}
                   </motion.div>
@@ -777,7 +794,9 @@ export function BookingWizard({
                         </>
                       ) : (
                         <>
-                          Send booking request
+                          {mfaRequired && !session.data
+                            ? 'Verify and send booking request'
+                            : 'Send booking request'}
                           <ArrowRight size={17} />
                         </>
                       )}

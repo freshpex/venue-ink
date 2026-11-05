@@ -37,6 +37,9 @@ it.skipIf(process.env.VENUE_ISOLATED_TESTS !== 'true')(
         });
       });
       await listening;
+      const config = await fetch(`http://127.0.0.1:${port}/venue-config.js`);
+      expect(config.headers.get('cache-control')).toBe('no-store');
+      expect(await config.text()).toBe('window.__VENUE_CONFIG__={"apiBase":"","appOrigin":""};');
       const base = `http://127.0.0.1:${port}/api`;
       const live = await fetch(base + '/health/live');
       expect(live.status).toBe(200);

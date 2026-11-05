@@ -7,6 +7,7 @@ import { Button } from './ui/button';
 import { navFeatures } from '../data/site';
 import { useSession, useApi } from '../lib/queries';
 import { TouchFeedback, MobileBookingAction } from './MotionSystem';
+import { CookiePreferences } from './CookiePreferences';
 export function Logo() {
   const site = useApi<{ settings: { brand_name: string } }>('/site');
   return (
@@ -230,6 +231,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Link to="/terms">Terms of service</Link>
             <Link to="/booking-terms">Booking terms</Link>
             <Link to="/privacy">Privacy</Link>
+            <CookiePreferences />
             <Link to="/credits">Photo credits</Link>
           </div>
           <span>Room for the craft. Space for you.</span>

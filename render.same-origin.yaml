@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: venue-platform
+    runtime: node
+    repo: https://github.com/freshpex/venue-ink
+    branch: dev
+    region: oregon
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SITE_URL
+        value: https://venue-platform-7gr1.onrender.com
+      - key: CLIENT_ORIGINS
+        value: https://venue-platform-7gr1.onrender.com,https://venue-ink.onrender.com
+      - key: COOKIE_SAME_SITE
+        value: lax
+      - key: VITE_API_URL
+        value: ''
+      - key: VITE_APP_ORIGIN
+        value: ''
+  - type: web
+    name: venue-ink
+    runtime: static
+    repo: https://github.com/freshpex/venue-ink
+    branch: dev
+    buildCommand: npm ci --include=dev && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        value: ''
+      - key: VITE_APP_ORIGIN
+        value: https://venue-platform-7gr1.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

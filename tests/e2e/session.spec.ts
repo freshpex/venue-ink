@@ -9,6 +9,16 @@ test.afterAll(async () => {
   await f?.cleanup();
 });
 test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem(
+        'venue-cookie-consent',
+        JSON.stringify({ version: 1, chat: false, savedAt: Date.now() }),
+      );
+    } catch {
+      /* Some payment frames have opaque origins. */
+    }
+  });
   await page.route('https://embed.tawk.to/**', (route) => route.abort());
 });
 
@@ -28,7 +38,7 @@ test('keeps the sign-in form visible when the browser cannot retain its session 
   await page.getByLabel('Email address', { exact: true }).fill(f.artist.email);
   await page.getByLabel('Password', { exact: true }).fill(f.artist.password);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('sign-in could not be verified');
+  await expect(page.getByRole('alert')).toContainText('sign-in could not be completed');
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeEnabled();
 });

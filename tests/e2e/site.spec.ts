@@ -9,6 +9,16 @@ test.afterAll(async () => {
   await f?.cleanup();
 });
 test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem(
+        'venue-cookie-consent',
+        JSON.stringify({ version: 1, chat: false, savedAt: Date.now() }),
+      );
+    } catch {
+      /* Some payment frames have opaque origins. */
+    }
+  });
   await page.route('https://embed.tawk.to/**', (route) => route.abort());
 });
 test('artist saves service, theme and availability through the workspace', async ({ page }) => {
