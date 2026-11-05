@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowUpRight, Eye, EyeOff, LoaderCircle, PenTool } from 'lucide-react';
+import { finishSignIn } from '../lib/session';
 import { request, waitForServer, apiBase } from '../lib/api';
 import { SaveForm, str } from '../features/workspace/Forms';
 import { useSession, useApi } from '../lib/queries';
@@ -97,12 +98,12 @@ export function WorkspaceLogin() {
             label="Complete organization sign-in"
             fields={[{ name: 'code', label: 'Authenticator or recovery code', required: true }]}
             onSave={async (data) => {
-              const response = await request<{ user: User }>('/auth/sso/complete', {
+              await request<{ user: User }>('/auth/sso/complete', {
                 method: 'POST',
                 body: JSON.stringify({ code: str(data, 'code') }),
               });
-              client.setQueryData(['session'], response.user);
-              navigate(response.user.role === 'admin' ? '/admin' : '/dashboard', { replace: true });
+              const user = await finishSignIn(client);
+              navigate(user.role === 'admin' ? '/admin' : '/dashboard', { replace: true });
             }}
           />
         ) : (
@@ -123,7 +124,7 @@ export function WorkspaceLogin() {
               try {
                 await waitForServer(setStatus, abort.signal);
                 setStatus(signup ? 'Creating your account…' : 'Signing you in…');
-                const response = await request<{ user: User }>(
+                await request<{ user: User }>(
                   signup ? '/auth/register' : '/auth/login',
                   {
                     method: 'POST',
@@ -141,13 +142,13 @@ export function WorkspaceLogin() {
                   },
                   abort.signal,
                 );
-                client.setQueryData(['session'], response.user);
+                const user = await finishSignIn(client, abort.signal);
                 const next = params.get('next');
                 toast.success(signup ? 'Your account is ready' : 'Welcome back');
                 navigate(
                   next && next.startsWith('/') && !next.startsWith('//')
                     ? next
-                    : response.user.role === 'admin'
+                    : user.role === 'admin'
                       ? '/admin'
                       : '/dashboard',
                   { replace: true },

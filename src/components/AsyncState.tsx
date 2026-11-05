@@ -10,11 +10,19 @@ export function Loading({ text = 'Connecting to your studio…' }: { text?: stri
   );
 }
 export function Failure({ message, retry }: { message: string; retry?: () => void }) {
+  const signInRequired = message === 'Sign in to continue.' || message === 'Please sign in again.';
   return (
     <div className="data-state" role="alert">
-      <h3>We couldn’t connect just yet.</h3>
+      <h3>{signInRequired ? 'Your session has ended.' : 'We couldn’t connect just yet.'}</h3>
       <p>{message}</p>
-      {retry && (
+      {signInRequired && (
+        <Button asChild variant="dark">
+          <Link to={'/login?next=' + encodeURIComponent(location.pathname + location.search)}>
+            Sign in
+          </Link>
+        </Button>
+      )}
+      {!signInRequired && retry && (
         <Button variant="outline" onClick={retry}>
           <RefreshCw size={16} />
           Try again
