@@ -33,6 +33,7 @@ export function createApp({
     .filter(Boolean),
   encryptionKey = process.env.DATA_ENCRYPTION_KEY || secret,
   siteUrl = process.env.SITE_URL || origins[0],
+  apiUrl = process.env.API_PUBLIC_URL || siteUrl,
   requireStaffMfa = process.env.REQUIRE_STAFF_MFA === 'true',
   logger = production ? (entry) => console.info(JSON.stringify(entry)) : () => {},
   isReady = () => true,
@@ -103,6 +104,7 @@ export function createApp({
     cors({
       origin: (origin, callback) => callback(null, !origin || origins.includes(origin)),
       credentials: true,
+      exposedHeaders: ['X-Venue-Session'],
     }),
   );
   app.use(express.json({ limit: '9mb' }));
@@ -152,16 +154,15 @@ export function createApp({
         new Date(Date.now() + options.maxAge),
       ],
     );
-    res.cookie(
-      'venue_session',
-      jwt.sign({ sub: user.id, sv: user.session_version, jti: sessionId }, secret, {
-        expiresIn: '7d',
-        issuer: 'venue',
-        audience: 'venue-account',
-        algorithm: 'HS256',
-      }),
-      options,
-    );
+    const token = jwt.sign({ sub: user.id, sv: user.session_version, jti: sessionId }, secret, {
+      expiresIn: '7d',
+      issuer: 'venue',
+      audience: 'venue-account',
+      algorithm: 'HS256',
+    });
+    res.cookie('venue_session', token, options);
+    if (req.get('X-Venue-Session') === 'browser' && origins.includes(req.get('Origin') || ''))
+      res.set('X-Venue-Session', token);
   };
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -180,7 +181,10 @@ export function createApp({
   });
   const fallbackHash = bcrypt.hashSync(randomBytes(32).toString('hex'), 12);
   const optionalAuth = async (req, _res, next) => {
-    const token = req.cookies.venue_session;
+    const authorization = req.get('Authorization');
+    const token = authorization
+      ? /^Bearer ([A-Za-z0-9._-]+)$/.exec(authorization)?.[1]
+      : req.cookies.venue_session;
     if (!token) return next();
     try {
       const claims = jwt.verify(token, secret, {
@@ -329,13 +333,14 @@ export function createApp({
       issuer: process.env.OIDC_ISSUER,
       clientId: process.env.OIDC_CLIENT_ID,
       clientSecret: process.env.OIDC_CLIENT_SECRET,
-      redirectUri: app.locals.siteUrl + '/api/auth/sso/callback',
+      redirectUri: apiUrl.replace(/\/$/, '') + '/api/auth/sso/callback',
     });
   app.locals.ssoEnabled = !!ssoProvider;
   ssoRoutes(app, {
     pool,
     key: encryptionKey,
     siteUrl: app.locals.siteUrl,
+    apiUrl: apiUrl.replace(/\/$/, ''),
     issue,
     limiter,
     production,

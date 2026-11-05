@@ -5,7 +5,8 @@ import { Button } from '../../components/ui/button';
 import { Loading, Failure, Empty } from '../../components/AsyncState';
 import { SaveForm, str, num, cents, checked } from './Forms';
 import type { Field } from './Forms';
-import { useApi, useSession, useRefresh, assetUrl, money, dateTime } from '../../lib/queries';
+import { useApi, useSession, useRefresh, money, dateTime } from '../../lib/queries';
+import { AssetImage } from '../../components/AssetImage';
 import { request } from '../../lib/api';
 import { uploadImage } from '../../lib/upload';
 import type { Service, FlashDesign, Asset, VenueEvent } from '../../lib/types';
@@ -354,7 +355,7 @@ export function ArtworkPanel() {
         <h2>Your original work.</h2>
         {query.data.designs.map((design) => (
           <button key={design.id} className="entity-row" onClick={() => setSelected(design)}>
-            <img className="row-thumb" src={assetUrl(design.image_url)} alt="" />
+            <AssetImage className="row-thumb" path={design.image_url} alt="" />
             <span>
               <strong>{design.title}</strong>
               <small>

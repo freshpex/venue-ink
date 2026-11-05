@@ -13,6 +13,8 @@ services:
       - key: NODE_ENV
         value: production
       - key: SITE_URL
+        value: https://venue-ink.onrender.com
+      - key: API_PUBLIC_URL
         value: https://venue-platform-7gr1.onrender.com
       - key: CLIENT_ORIGINS
         value: https://venue-platform-7gr1.onrender.com,https://venue-ink.onrender.com
@@ -31,9 +33,11 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
-        value: ''
-      - key: VITE_APP_ORIGIN
         value: https://venue-platform-7gr1.onrender.com
+      - key: VITE_APP_ORIGIN
+        value: ''
+      - key: SITE_URL
+        value: https://venue-ink.onrender.com
     routes:
       - type: rewrite
         source: /*

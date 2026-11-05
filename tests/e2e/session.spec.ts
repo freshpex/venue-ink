@@ -13,7 +13,7 @@ test.beforeEach(async ({ page }) => {
     try {
       localStorage.setItem(
         'venue-cookie-consent',
-        JSON.stringify({ version: 1, chat: false, savedAt: Date.now() }),
+        JSON.stringify({ version: 2, chat: true, savedAt: Date.now() }),
       );
     } catch {
       /* Some payment frames have opaque origins. */

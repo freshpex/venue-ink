@@ -4,7 +4,8 @@ import { ArrowLeft, MessageSquare, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import { Loading, Failure } from '../components/AsyncState';
-import { useSession, useApi, useRefresh, dateTime, money, assetUrl } from '../lib/queries';
+import { useSession, useApi, useRefresh, dateTime, money } from '../lib/queries';
+import { AssetImage } from '../components/AssetImage';
 import { request } from '../lib/api';
 import type { Booking, Asset, Message } from '../lib/types';
 import { CheckoutPanel } from '../features/payments/CheckoutPanel';
@@ -94,9 +95,7 @@ export default function BookingDetail() {
             <p className="pre-wrap">{b.notes}</p>
             <div className="asset-grid">
               {query.data.assets.map((asset) => (
-                <a key={asset.id} href={assetUrl(asset.url)} target="_blank" rel="noreferrer">
-                  <img src={assetUrl(asset.url)} alt={asset.filename} />
-                </a>
+                <AssetImage key={asset.id} path={asset.url} alt={asset.filename} linked />
               ))}
             </div>
             {b.cancellation_note && <p>{b.cancellation_note}</p>}

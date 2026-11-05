@@ -30,20 +30,23 @@ if (
   process.exit(1);
 }
 const siteUrl = process.env.SITE_URL || origins[0];
+const apiUrl = process.env.API_PUBLIC_URL || siteUrl;
 try {
-  const url = new URL(siteUrl);
-  if (
-    production &&
-    (url.protocol !== 'https:' ||
-      url.username ||
-      url.password ||
-      url.search ||
-      url.hash ||
-      url.pathname !== '/')
-  )
-    throw new Error();
+  for (const value of [siteUrl, apiUrl]) {
+    const url = new URL(value);
+    if (
+      production &&
+      (url.protocol !== 'https:' ||
+        url.username ||
+        url.password ||
+        url.search ||
+        url.hash ||
+        url.pathname !== '/')
+    )
+      throw new Error();
+  }
 } catch {
-  console.error('SITE_URL must be a valid site origin, using HTTPS in production.');
+  console.error('SITE_URL and API_PUBLIC_URL must be valid origins, using HTTPS in production.');
   process.exit(1);
 }
 let ready = false;
@@ -52,6 +55,7 @@ const app = createApp({
   pool,
   secret: process.env.JWT_SECRET,
   origins,
+  apiUrl,
   production,
   securityHeaders: production || process.env.SECURITY_HEADERS === 'true',
   isReady: () => ready,
@@ -64,6 +68,12 @@ app.get('/venue-config.js', (_req, res) => {
   // A server-hosted build always uses its own API, including when build variables are stale.
   res.type('application/javascript').send('window.__VENUE_CONFIG__={"apiBase":"","appOrigin":""};');
 });
+if (new URL(siteUrl).origin !== new URL(apiUrl).origin) {
+  app.get(/^(?!\/api(?:\/|$)).*/, (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.redirect(302, new URL(siteUrl).origin + req.originalUrl);
+  });
+}
 if ((production || process.env.SERVE_DIST === 'true') && existsSync(`${dist}/index.html`)) {
   app.get(/^(?!\/api(?:\/|$)).*/, (req, res, next) => {
     if (

@@ -4,7 +4,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ArrowUpRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { SaveForm, str, checked, options } from './Forms';
-import { useApi, useSession, useRefresh, assetUrl } from '../../lib/queries';
+import { useApi, useSession, useRefresh } from '../../lib/queries';
+import { AssetImage } from '../../components/AssetImage';
 import { request } from '../../lib/api';
 import { uploadImage } from '../../lib/upload';
 import type { Artist, Studio, Asset } from '../../lib/types';
@@ -167,7 +168,7 @@ export function AccountPanel() {
         <div className="asset-grid">
           {assets.data?.assets.map((asset) => (
             <div key={asset.id}>
-              <img src={assetUrl(asset.url)} alt={asset.filename} />
+              <AssetImage path={asset.url} alt={asset.filename} />
               <span>{asset.filename}</span>
               <Button
                 variant="outline"

@@ -5,12 +5,12 @@ import { X } from 'lucide-react';
 import { Button } from './ui/button';
 
 const key = 'venue-cookie-consent';
-type Consent = { version: 1; chat: boolean; savedAt: number };
+type Consent = { version: 2; chat: true; savedAt: number };
 function readConsent(): Consent | null {
   try {
     const value = JSON.parse(localStorage.getItem(key) || 'null');
-    return value?.version === 1 &&
-      typeof value.chat === 'boolean' &&
+    return value?.version === 2 &&
+      value.chat === true &&
       typeof value.savedAt === 'number' &&
       value.savedAt <= Date.now() &&
       value.savedAt > Date.now() - 180 * 86400000
@@ -24,51 +24,38 @@ function readConsent(): Consent | null {
 export function CookiePreferences() {
   const [consent, setConsent] = useState(readConsent);
   const [open, setOpen] = useState(false);
-  const [chat, setChat] = useState(consent?.chat ?? false);
-  function save(allowChat: boolean) {
-    const choice: Consent = { version: 1, chat: allowChat, savedAt: Date.now() };
+  function save() {
+    const choice: Consent = { version: 2, chat: true, savedAt: Date.now() };
     try {
       localStorage.setItem(key, JSON.stringify(choice));
     } catch {
       /* Sign-in remains available if preference storage is unavailable. */
     }
     setConsent(choice);
-    setChat(allowChat);
     setOpen(false);
-    window.dispatchEvent(new CustomEvent('venue:cookie-consent', { detail: choice }));
-    if (consent?.chat && !allowChat) window.location.reload();
   }
   return (
     <>
       {!consent && (
         <section className="cookie-banner" aria-label="Cookie choices">
           <div>
-            <h2>Your privacy, your choice.</h2>
+            <h2>Cookies for your Venue.</h2>
             <p>
-              Essential cookies keep sign-in and bookings working. Optional cookies enable live
-              chat. <Link to="/privacy">Privacy notice</Link>
+              Essential cookies support sign-in, bookings and live chat.{' '}
+              <Link to="/privacy">Privacy notice</Link>
             </p>
           </div>
           <div className="cookie-actions">
-            <Button variant="outline" onClick={() => save(false)}>
-              Only essential
-            </Button>
-            <Button variant="dark" onClick={() => save(true)}>
-              Allow all
+            <Button variant="outline" onClick={save}>
+              Accept essential cookies
             </Button>
             <button type="button" className="text-button" onClick={() => setOpen(true)}>
-              Manage preferences
+              Cookie details
             </button>
           </div>
         </section>
       )}
-      <Dialog.Root
-        open={open}
-        onOpenChange={(value) => {
-          setChat(consent?.chat ?? false);
-          setOpen(value);
-        }}
-      >
+      <Dialog.Root open={open} onOpenChange={setOpen}>
         <Dialog.Trigger asChild>
           <button type="button" className="cookie-settings-link">
             Cookie settings
@@ -79,8 +66,8 @@ export function CookiePreferences() {
           <Dialog.Content className="cookie-dialog">
             <Dialog.Title>Cookie preferences</Dialog.Title>
             <Dialog.Description>
-              You can sign in and book with essential cookies only. Choose whether to enable
-              optional live chat.
+              These services keep your account, bookings and live support working and are always
+              enabled.
             </Dialog.Description>
             <label className="cookie-choice">
               <span>
@@ -91,25 +78,19 @@ export function CookiePreferences() {
             </label>
             <label className="cookie-choice">
               <span>
-                <strong>Live chat</strong>
-                <small>Allow Tawk.to to provide live support and remember conversations.</small>
+                <strong>Essential live chat</strong>
+                <small>Tawk.to provides live support and remembers conversations. Always on.</small>
               </span>
               <input
                 type="checkbox"
-                checked={chat}
-                onChange={(event) => setChat(event.target.checked)}
-                aria-label="Optional live chat cookies"
+                checked
+                disabled
+                aria-label="Essential live chat cookies, always on"
               />
             </label>
             <div className="cookie-actions">
-              <Button variant="outline" onClick={() => save(false)}>
-                Only essential
-              </Button>
-              <Button variant="dark" onClick={() => save(chat)}>
-                Save preferences
-              </Button>
-              <Button variant="outline" onClick={() => save(true)}>
-                Allow all
+              <Button variant="dark" onClick={save}>
+                Done
               </Button>
             </div>
             <Dialog.Close className="cookie-close" aria-label="Close cookie preferences">

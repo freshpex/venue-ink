@@ -1,4 +1,5 @@
 import { configuredApiBase } from './runtime';
+import { saveSessionCredential, sessionHeaders } from './credentials';
 const configured = configuredApiBase.replace(/\/$/, '');
 export const apiBase = configured;
 export class ApiError extends Error {
@@ -42,6 +43,7 @@ export async function request<T>(
         headers: {
           'Content-Type': 'application/json',
           'X-Requested-With': 'VenueWorkspace',
+          ...sessionHeaders(apiBase),
           ...options.headers,
         },
         signal: deadline.signal,
@@ -58,8 +60,13 @@ export async function request<T>(
     const data = await response.json().catch(() => {
       throw new ApiError('The server response could not be read. Please try again.', 503);
     });
-    if (!response.ok)
+    if (!response.ok) {
+      if (response.status === 401 && path !== '/auth/login') saveSessionCredential(null);
       throw new ApiError(data.message || 'The request could not be completed.', response.status);
+    }
+    const credential = response.headers.get('X-Venue-Session');
+    if (credential) saveSessionCredential(credential);
+    if (path === '/auth/logout' || path === '/security/revoke-all') saveSessionCredential(null);
     return data as T;
   } finally {
     deadline.dispose();
@@ -116,6 +123,7 @@ export async function download(path: string, filename: string) {
   try {
     const response = await fetch(apiBase + '/api' + path, {
       credentials: 'include',
+      headers: sessionHeaders(apiBase),
       signal: deadline.signal,
     });
     if (!response.ok) {
@@ -130,6 +138,22 @@ export async function download(path: string, filename: string) {
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } finally {
+    deadline.dispose();
+  }
+}
+
+export async function assetBlob(path: string, signal: AbortSignal): Promise<Blob> {
+  if (!/^\/api\/assets\/[a-f0-9-]+$/i.test(path)) throw new Error('Invalid image path.');
+  const deadline = requestSignal(30000, signal);
+  try {
+    const response = await fetch(apiBase + path, {
+      credentials: 'include',
+      headers: sessionHeaders(apiBase),
+      signal: deadline.signal,
+    });
+    if (!response.ok) throw new ApiError('The image could not be loaded.', response.status);
+    return await response.blob();
   } finally {
     deadline.dispose();
   }
