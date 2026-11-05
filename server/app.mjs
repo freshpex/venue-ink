@@ -35,6 +35,7 @@ export function createApp({
   siteUrl = process.env.SITE_URL || origins[0],
   requireStaffMfa = process.env.REQUIRE_STAFF_MFA === 'true',
   logger = production ? (entry) => console.info(JSON.stringify(entry)) : () => {},
+  isReady = () => true,
 }) {
   if (!secret || secret.length < 32)
     throw new Error('JWT_SECRET must contain at least 32 characters');
@@ -111,6 +112,11 @@ export function createApp({
     next();
   });
   app.get('/api/health/live', (_req, res) => res.json({ alive: true, service: 'venue' }));
+  app.use('/api', (_req, res, next) => {
+    if (isReady()) return next();
+    res.set('Retry-After', '3');
+    res.status(503).json({ ready: false, message: 'The server is preparing your workspace.' });
+  });
   app.get('/api/health', async (_req, res) => {
     try {
       await pool.query('SELECT 1 FROM venue_app.settings LIMIT 1');
