@@ -33,6 +33,7 @@ const Credits = lazy(() => import('./pages/Resources').then((m) => ({ default: m
 const NotFound = lazy(() => import('./pages/Resources').then((m) => ({ default: m.NotFound })));
 const Login = lazy(() => import('./pages/Workspace').then((m) => ({ default: m.WorkspaceLogin })));
 const Workspace = lazy(() => import('./pages/Dashboard'));
+const AccountAccess = lazy(() => import('./pages/AccountAccess'));
 const BookingDetail = lazy(() => import('./pages/BookingDetail'));
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: boolean }> {
   state = { error: false };
@@ -67,7 +68,7 @@ function Metadata() {
       .querySelector('meta[name="robots"]')
       ?.setAttribute(
         'content',
-        /^\/(admin|dashboard|bookings|workspace|login|register)(\/|$)/.test(pathname)
+        /^\/(admin|dashboard|bookings|workspace|login|register|account-access)(\/|$)/.test(pathname)
           ? 'noindex,nofollow'
           : 'index,follow',
       );
@@ -139,6 +140,7 @@ export default function App() {
                 <Route path="/workspace/login" element={<Login />} />
                 <Route path="/workspace/register" element={<Login />} />
                 <Route path="/workspace" element={<Workspace />} />
+                <Route path="/account-access" element={<AccountAccess />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Login />} />
                 <Route path="/dashboard" element={<Workspace />} />

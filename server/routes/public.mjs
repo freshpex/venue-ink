@@ -11,7 +11,7 @@ export function publicRoutes(app, { pool, writeLimiter }) {
         ['site'],
       )
     ).rows[0];
-    res.json({ settings, paymentMethods });
+    res.json({ settings, paymentMethods, cardPaymentsEnabled: !!app.locals.cardPaymentsEnabled });
   });
   app.get('/api/artists', async (_req, res) => {
     const artists = (
@@ -144,7 +144,7 @@ export function publicRoutes(app, { pool, writeLimiter }) {
         permitted =
           (
             await pool.query(
-              'SELECT 1 FROM venue_app.booking_assets ba JOIN venue_app.bookings b ON b.id=ba.booking_id JOIN venue_app.artist_profiles a ON a.user_id=b.artist_id LEFT JOIN venue_app.studios st ON st.id=a.studio_id WHERE ba.asset_id=$1 AND (b.client_id=$2 OR ($3=true AND (b.artist_id=$2 OR st.owner_id=$2)))',
+              "SELECT 1 FROM venue_app.booking_assets ba JOIN venue_app.bookings b ON b.id=ba.booking_id JOIN venue_app.artist_profiles a ON a.user_id=b.artist_id LEFT JOIN venue_app.studios st ON st.id=a.studio_id WHERE ba.asset_id=$1 AND (b.client_id=$2 OR ($3=true AND (b.artist_id=$2 OR st.owner_id=$2 OR EXISTS(SELECT 1 FROM venue_app.studio_access sa WHERE sa.studio_id=st.id AND sa.user_id=$2 AND sa.access_role IN ('manager','receptionist')))))",
               [assetId, req.user.id, req.user.role !== 'client'],
             )
           ).rowCount > 0;

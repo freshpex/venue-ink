@@ -1,4 +1,5 @@
 export type User = {
+  mfaEnabled?: boolean;
   id: string;
   name: string;
   email: string;
@@ -102,6 +103,9 @@ export type ArticleData = {
   published?: boolean;
 };
 export type Payment = {
+  can_open_booking?: boolean;
+  provider_payment_id?: string | null;
+  refunded_cents?: number;
   id: string;
   booking_id: string;
   reference: string;

@@ -44,6 +44,11 @@ export function AccountPanel() {
           fields={[
             { name: 'current', label: 'Current password', type: 'password', required: true },
             { name: 'next', label: 'New password', type: 'password', required: true },
+            {
+              name: 'code',
+              label: 'Authenticator or recovery code',
+              hint: 'Required when two-factor authentication is enabled.',
+            },
           ]}
           label="Update password"
           onSave={async (data) => {
@@ -52,6 +57,7 @@ export function AccountPanel() {
               body: JSON.stringify({
                 currentPassword: String(data.get('current') || ''),
                 newPassword: String(data.get('next') || ''),
+                code: str(data, 'code'),
               }),
             });
           }}

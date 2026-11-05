@@ -36,7 +36,7 @@ export function workspaceRoutes(app, { pool }) {
       ).rows[0] || null;
     const studios = (
       await pool.query(
-        'SELECT id,name,slug,bio,location,timezone,published FROM venue_app.studios WHERE owner_id=$1 OR $2=true ORDER BY created_at',
+        "SELECT id,name,slug,bio,location,timezone,published FROM venue_app.studios WHERE owner_id=$1 OR $2=true OR EXISTS(SELECT 1 FROM venue_app.studio_access sa WHERE sa.studio_id=venue_app.studios.id AND sa.user_id=$1 AND sa.access_role='manager') ORDER BY created_at",
         [req.user.id, req.user.role === 'admin'],
       )
     ).rows;
@@ -166,17 +166,23 @@ export function workspaceRoutes(app, { pool }) {
         .strict(),
       req.body,
     );
-    await pool.query(
-      'UPDATE venue_app.studios SET name=$1,bio=$2,location=$3,timezone=$4,published=$5 WHERE id=$6',
-      [values.name, values.bio, values.location, values.timezone, values.published, studioId],
-    );
+    await transaction(pool, async (db) => {
+      await db.query(
+        'UPDATE venue_app.studios SET name=$1,bio=$2,location=$3,timezone=$4,published=$5 WHERE id=$6',
+        [values.name, values.bio, values.location, values.timezone, values.published, studioId],
+      );
+      await audit(db, req.user, 'studio.updated', studioId, {
+        name: values.name,
+        published: values.published,
+      });
+    });
     res.json({ ok: true });
   });
   app.get('/api/workspace/services', staff, async (req, res) =>
     res.json({
       services: (
         await pool.query(
-          'SELECT s.id,s.studio_id,s.name,s.description,s.category,s.duration_minutes,s.price_cents,s.deposit_cents,s.currency,s.active,st.name AS studio_name FROM venue_app.services s JOIN venue_app.studios st ON st.id=s.studio_id WHERE st.owner_id=$1 OR $2=true ORDER BY s.created_at',
+          "SELECT s.id,s.studio_id,s.name,s.description,s.category,s.duration_minutes,s.price_cents,s.deposit_cents,s.currency,s.active,st.name AS studio_name FROM venue_app.services s JOIN venue_app.studios st ON st.id=s.studio_id WHERE st.owner_id=$1 OR $2=true OR EXISTS(SELECT 1 FROM venue_app.studio_access sa WHERE sa.studio_id=st.id AND sa.user_id=$1 AND sa.access_role='manager') ORDER BY s.created_at",
           [req.user.id, req.user.role === 'admin'],
         )
       ).rows,
@@ -188,12 +194,48 @@ export function workspaceRoutes(app, { pool }) {
       throw new HttpError(403, 'You cannot manage this studio.');
     if (v.priceCents !== null && v.depositCents > v.priceCents)
       throw new HttpError(400, 'A deposit cannot be greater than the service price.');
-    const service = (
-      await pool.query(
-        'INSERT INTO venue_app.services(id,studio_id,name,description,category,duration_minutes,price_cents,deposit_cents,active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id',
+    const service = await transaction(pool, async (db) => {
+      const service = (
+        await db.query(
+          'INSERT INTO venue_app.services(id,studio_id,name,description,category,duration_minutes,price_cents,deposit_cents,active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id',
+          [
+            randomUUID(),
+            v.studioId,
+            v.name,
+            v.description,
+            v.category,
+            v.durationMinutes,
+            v.priceCents,
+            v.depositCents,
+            v.active,
+          ],
+        )
+      ).rows[0];
+      await audit(db, req.user, 'service.created', service.id, { name: v.name });
+      return service;
+    });
+    res.status(201).json({ service });
+  });
+  app.put('/api/workspace/services/:id', staff, async (req, res) => {
+    const serviceId = parse(id, req.params.id),
+      v = parse(serviceInput, req.body);
+    if (v.priceCents !== null && v.depositCents > v.priceCents)
+      throw new HttpError(400, 'A deposit cannot be greater than the service price.');
+    await transaction(pool, async (db) => {
+      const existing = (
+        await db.query('SELECT studio_id FROM venue_app.services WHERE id=$1 FOR UPDATE', [
+          serviceId,
+        ])
+      ).rows[0];
+      if (
+        !existing ||
+        existing.studio_id !== v.studioId ||
+        !(await canManageStudio(db, existing.studio_id, req.user))
+      )
+        throw new HttpError(404, 'Service not found.');
+      await db.query(
+        'UPDATE venue_app.services SET name=$1,description=$2,category=$3,duration_minutes=$4,price_cents=$5,deposit_cents=$6,active=$7 WHERE id=$8',
         [
-          randomUUID(),
-          v.studioId,
           v.name,
           v.description,
           v.category,
@@ -201,51 +243,24 @@ export function workspaceRoutes(app, { pool }) {
           v.priceCents,
           v.depositCents,
           v.active,
+          serviceId,
         ],
-      )
-    ).rows[0];
-    res.status(201).json({ service });
-  });
-  app.put('/api/workspace/services/:id', staff, async (req, res) => {
-    const serviceId = parse(id, req.params.id);
-    const v = parse(serviceInput, req.body);
-    const existing = (
-      await pool.query('SELECT studio_id FROM venue_app.services WHERE id=$1', [serviceId])
-    ).rows[0];
-    if (
-      !existing ||
-      existing.studio_id !== v.studioId ||
-      !(await canManageStudio(pool, existing.studio_id, req.user))
-    )
-      throw new HttpError(404, 'Service not found.');
-    if (v.priceCents !== null && v.depositCents > v.priceCents)
-      throw new HttpError(400, 'A deposit cannot be greater than the service price.');
-    await pool.query(
-      'UPDATE venue_app.services SET name=$1,description=$2,category=$3,duration_minutes=$4,price_cents=$5,deposit_cents=$6,active=$7 WHERE id=$8',
-      [
-        v.name,
-        v.description,
-        v.category,
-        v.durationMinutes,
-        v.priceCents,
-        v.depositCents,
-        v.active,
-        serviceId,
-      ],
-    );
+      );
+      await audit(db, req.user, 'service.updated', serviceId, { name: v.name });
+    });
     res.json({ ok: true });
   });
   app.get('/api/team', staff, async (req, res) =>
     res.json({
       members: (
         await pool.query(
-          'SELECT a.user_id AS id,a.studio_id,a.display_name,a.slug,a.published,a.books_open,u.email,u.active,st.name AS studio_name FROM venue_app.artist_profiles a JOIN venue_app.users u ON u.id=a.user_id JOIN venue_app.studios st ON st.id=a.studio_id WHERE st.owner_id=$1 OR $2=true ORDER BY a.created_at',
+          "SELECT a.user_id AS id,a.studio_id,a.display_name,a.slug,a.published,a.books_open,u.email,u.active,st.name AS studio_name FROM venue_app.artist_profiles a JOIN venue_app.users u ON u.id=a.user_id JOIN venue_app.studios st ON st.id=a.studio_id WHERE st.owner_id=$1 OR $2=true OR EXISTS(SELECT 1 FROM venue_app.studio_access sa WHERE sa.studio_id=st.id AND sa.user_id=$1 AND sa.access_role='manager') ORDER BY a.created_at",
           [req.user.id, req.user.role === 'admin'],
         )
       ).rows,
       invitations: (
         await pool.query(
-          'SELECT i.id,i.email,i.expires_at,i.accepted_at,st.name AS studio_name FROM venue_app.invitations i JOIN venue_app.studios st ON st.id=i.studio_id WHERE st.owner_id=$1 OR $2=true ORDER BY i.created_at DESC LIMIT 100',
+          "SELECT i.id,i.email,i.expires_at,i.accepted_at,st.name AS studio_name FROM venue_app.invitations i JOIN venue_app.studios st ON st.id=i.studio_id WHERE st.owner_id=$1 OR $2=true OR EXISTS(SELECT 1 FROM venue_app.studio_access sa WHERE sa.studio_id=st.id AND sa.user_id=$1 AND sa.access_role='manager') ORDER BY i.created_at DESC LIMIT 100",
           [req.user.id, req.user.role === 'admin'],
         )
       ).rows,

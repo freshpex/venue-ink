@@ -7,14 +7,18 @@ import { Loading, Failure } from '../components/AsyncState';
 import { useSession, useApi, useRefresh, dateTime, money, assetUrl } from '../lib/queries';
 import { request } from '../lib/api';
 import type { Booking, Asset, Message } from '../lib/types';
+import { RefundHistory } from '../features/payments/RefundHistory';
 import { CheckoutPanel } from '../features/payments/CheckoutPanel';
 import { SaveForm, str, cents } from '../features/workspace/Forms';
 export default function BookingDetail() {
   const session = useSession();
   const { id } = useParams();
-  const query = useApi<{ booking: Booking; assets: Asset[] }>('/bookings/' + id, {
-    enabled: !!session.data,
-  });
+  const query = useApi<{ booking: Booking; assets: Asset[]; canManage: boolean }>(
+    '/bookings/' + id,
+    {
+      enabled: !!session.data,
+    },
+  );
   const messages = useApi<{ messages: Message[] }>('/bookings/' + id + '/messages', {
     enabled: !!session.data,
     interval: 15000,
@@ -27,9 +31,7 @@ export default function BookingDetail() {
   if (query.isPending) return <Loading />;
   if (query.isError) return <Failure message={query.error.message} retry={() => query.refetch()} />;
   const b = query.data.booking;
-  const manager =
-    (session.data.role !== 'client' && b.client_id !== session.data.id) ||
-    session.data.role === 'admin';
+  const manager = query.data.canManage;
   const closed = ['declined', 'cancelled', 'completed'].includes(b.status);
   return (
     <section className="container booking-detail-page">
@@ -47,6 +49,7 @@ export default function BookingDetail() {
         </div>
         <span className={'status status-' + b.status}>{b.status}</span>
       </div>
+      <RefundHistory bookingId={b.id} />
       <div className="workspace-columns">
         <div>
           <section className="workspace-card">

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
+import { pagination } from '../security.mjs';
 import { parse, id, email, timezone, articleInput, password, HttpError } from '../validation.mjs';
 import { transaction } from '../db.mjs';
 import { audit, notify, canManageStudio, isStaff } from '../domain.mjs';
@@ -13,7 +14,7 @@ export function adminRoutes(app, { pool }) {
     res.json({
       events: (
         await pool.query(
-          'SELECT e.id,e.studio_id,e.artist_id,e.service_id,e.title,e.description,e.location,e.starts_at,e.ends_at,e.capacity,e.published FROM venue_app.events e JOIN venue_app.studios st ON st.id=e.studio_id WHERE st.owner_id=$1 OR e.artist_id=$1 OR $2=true ORDER BY e.starts_at DESC LIMIT 100',
+          "SELECT e.id,e.studio_id,e.artist_id,e.service_id,e.title,e.description,e.location,e.starts_at,e.ends_at,e.capacity,e.published FROM venue_app.events e JOIN venue_app.studios st ON st.id=e.studio_id WHERE st.owner_id=$1 OR e.artist_id=$1 OR $2=true OR EXISTS(SELECT 1 FROM venue_app.studio_access sa WHERE sa.studio_id=st.id AND sa.user_id=$1 AND sa.access_role=ANY(ARRAY['manager'])) ORDER BY e.starts_at DESC LIMIT 100",
           [req.user.id, req.user.role === 'admin'],
         )
       ).rows,
@@ -97,15 +98,25 @@ export function adminRoutes(app, { pool }) {
     res.json({ overview: result });
   });
   app.get('/api/admin/users', async (req, res) => {
-    const search = String(req.query.search || '').slice(0, 100);
-    res.json({
-      users: (
-        await pool.query(
-          'SELECT id,name,email,role,active,created_at FROM venue_app.users WHERE name ILIKE $1 OR email ILIKE $1 ORDER BY created_at DESC LIMIT 200',
-          [`%${search}%`],
-        )
-      ).rows,
-    });
+    const { page, limit, offset } = pagination(req.query);
+    const search = '%' + String(req.query.search || '').slice(0, 100) + '%';
+    const role = req.query.role
+      ? parse(z.enum(['admin', 'studio', 'artist', 'client']), req.query.role)
+      : null;
+    const where = '(name ILIKE $1 OR email ILIKE $1) AND ($2::text IS NULL OR role=$2)';
+    const total = Number(
+      (await pool.query('SELECT count(*) FROM venue_app.users WHERE ' + where, [search, role]))
+        .rows[0].count,
+    );
+    const users = (
+      await pool.query(
+        'SELECT id,name,email,role,active,created_at FROM venue_app.users WHERE ' +
+          where +
+          ' ORDER BY created_at DESC,id LIMIT $3 OFFSET $4',
+        [search, role, limit, offset],
+      )
+    ).rows;
+    res.json({ users, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
   });
   const accountInput = z
     .object({
@@ -404,13 +415,17 @@ export function adminRoutes(app, { pool }) {
     await audit(pool, req.user, 'settings.updated', 'site');
     res.json({ ok: true });
   });
-  app.get('/api/admin/audit', async (_req, res) =>
-    res.json({
-      entries: (
-        await pool.query(
-          "SELECT a.id,a.action,a.entity_id,a.details,a.created_at,u.name AS actor_name,COALESCE((SELECT name FROM venue_app.users WHERE id::text=a.entity_id),(SELECT title FROM venue_app.bookings WHERE id::text=a.entity_id),(SELECT name FROM venue_app.studios WHERE id::text=a.entity_id),(SELECT title FROM venue_app.articles WHERE id::text=a.entity_id),(SELECT name FROM venue_app.support_requests WHERE id::text=a.entity_id),a.details->>'name',a.entity_id) AS entity_name FROM venue_app.audit_logs a LEFT JOIN venue_app.users u ON u.id=a.actor_id ORDER BY a.created_at DESC LIMIT 200",
-        )
-      ).rows,
-    }),
-  );
+  app.get('/api/admin/audit', async (req, res) => {
+    const { page, limit, offset } = pagination(req.query);
+    const total = Number(
+      (await pool.query('SELECT count(*) FROM venue_app.audit_logs')).rows[0].count,
+    );
+    const entries = (
+      await pool.query(
+        "SELECT a.id,a.action,a.entity_id,a.details,a.created_at,u.name AS actor_name,COALESCE((SELECT name FROM venue_app.users WHERE id::text=a.entity_id),(SELECT title FROM venue_app.bookings WHERE id::text=a.entity_id),(SELECT name FROM venue_app.studios WHERE id::text=a.entity_id),(SELECT title FROM venue_app.articles WHERE id::text=a.entity_id),(SELECT name FROM venue_app.support_requests WHERE id::text=a.entity_id),a.details->>'name',a.entity_id) AS entity_name FROM venue_app.audit_logs a LEFT JOIN venue_app.users u ON u.id=a.actor_id ORDER BY a.created_at DESC,a.id LIMIT $1 OFFSET $2",
+        [limit, offset],
+      )
+    ).rows;
+    res.json({ entries, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+  });
 }

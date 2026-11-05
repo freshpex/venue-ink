@@ -1,4 +1,6 @@
 import express from 'express';
+import Stripe from 'stripe';
+import { cardWebhook, cardRoutes } from './routes/cards.mjs';
 import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -13,6 +15,11 @@ import { userFields, audit } from './domain.mjs';
 import { publicRoutes } from './routes/public.mjs';
 import { bookingRoutes } from './routes/bookings.mjs';
 import { workspaceRoutes } from './routes/workspace.mjs';
+import { ssoRoutes, configuredOidc } from './routes/sso.mjs';
+import { accessRoutes } from './routes/access.mjs';
+import { securityRoutes } from './routes/security.mjs';
+import { checkSecondFactor, digest } from './security.mjs';
+import { enterpriseRoutes } from './routes/enterprise.mjs';
 import { adminRoutes } from './routes/admin.mjs';
 export function createApp({
   pool,
@@ -21,11 +28,44 @@ export function createApp({
   production = false,
   securityHeaders = production,
   limit = 20,
+  oidcProvider,
+  oidcDomains = (process.env.OIDC_ALLOWED_DOMAINS || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
+  encryptionKey = process.env.DATA_ENCRYPTION_KEY || secret,
+  siteUrl = process.env.SITE_URL || origins[0],
+  requireStaffMfa = process.env.REQUIRE_STAFF_MFA === 'true',
+  stripe = process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET
+    ? new Stripe(process.env.STRIPE_SECRET_KEY, { maxNetworkRetries: 2, timeout: 15000 })
+    : null,
+  webhookSecret = process.env.STRIPE_WEBHOOK_SECRET,
+  logger = production ? (entry) => console.info(JSON.stringify(entry)) : () => {},
 }) {
   if (!secret || secret.length < 32)
     throw new Error('JWT_SECRET must contain at least 32 characters');
   const app = express();
   app.disable('x-powered-by');
+  app.locals.encryptionKey = encryptionKey;
+  app.locals.siteUrl = siteUrl.replace(/\/$/, '');
+  app.locals.requireStaffMfa = requireStaffMfa;
+  app.use((req, res, next) => {
+    req.requestId = randomUUID();
+    res.set('X-Request-Id', req.requestId);
+    const start = performance.now();
+    res.on('finish', () => {
+      if (req.path.startsWith('/api'))
+        logger({
+          event: 'http.request',
+          requestId: req.requestId,
+          method: req.method,
+          route: req.route?.path || 'unmatched',
+          status: res.statusCode,
+          durationMs: Math.round(performance.now() - start),
+        });
+    });
+    next();
+  });
   app.set('trust proxy', 1);
   app.use(
     helmet({
@@ -68,12 +108,15 @@ export function createApp({
       credentials: true,
     }),
   );
+  app.locals.cardPaymentsEnabled = !!stripe;
+  cardWebhook(app, { pool, stripe, webhookSecret });
   app.use(express.json({ limit: '9mb' }));
   app.use(cookieParser());
   app.use('/api', (_req, res, next) => {
     res.set('Cache-Control', 'no-store');
     next();
   });
+  app.get('/api/health/live', (_req, res) => res.json({ alive: true, service: 'venue' }));
   app.get('/api/health', async (_req, res) => {
     try {
       await pool.query('SELECT 1 FROM venue_app.settings LIMIT 1');
@@ -94,14 +137,24 @@ export function createApp({
   const options = {
     httpOnly: true,
     secure: production,
-    sameSite: production ? process.env.COOKIE_SAME_SITE || 'none' : 'lax',
+    sameSite: production ? process.env.COOKIE_SAME_SITE || 'lax' : 'lax',
     path: '/api',
     maxAge: 7 * 24 * 60 * 60 * 1000,
   };
-  const issue = (res, user) =>
+  const issue = async (req, res, user) => {
+    const sessionId = randomUUID();
+    await pool.query(
+      'INSERT INTO venue_app.sessions(id,user_id,user_agent,expires_at) VALUES($1,$2,$3,$4)',
+      [
+        sessionId,
+        user.id,
+        (req.get('User-Agent') || 'Unknown browser').slice(0, 300),
+        new Date(Date.now() + options.maxAge),
+      ],
+    );
     res.cookie(
       'venue_session',
-      jwt.sign({ sub: user.id, sv: user.session_version }, secret, {
+      jwt.sign({ sub: user.id, sv: user.session_version, jti: sessionId }, secret, {
         expiresIn: '7d',
         issuer: 'venue',
         audience: 'venue-account',
@@ -109,6 +162,7 @@ export function createApp({
       }),
       options,
     );
+  };
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     limit,
@@ -135,11 +189,27 @@ export function createApp({
       });
       const user = (
         await pool.query(
-          `SELECT ${userFields},active,session_version FROM venue_app.users WHERE id=$1`,
+          `SELECT ${userFields},active,session_version,(mfa_secret IS NOT NULL) AS mfa_enabled FROM venue_app.users WHERE id=$1`,
           [claims.sub],
         )
       ).rows[0];
-      if (user?.active && user.session_version === claims.sv) req.user = user;
+      if (
+        user?.active &&
+        user.session_version === claims.sv &&
+        typeof claims.jti === 'string' &&
+        /^[0-9a-f-]{36}$/.test(claims.jti)
+      ) {
+        const session = (
+          await pool.query(
+            'SELECT id FROM venue_app.sessions WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL AND expires_at>now()',
+            [claims.jti, user.id],
+          )
+        ).rows[0];
+        if (session) {
+          req.user = user;
+          req.sessionId = session.id;
+        }
+      }
       next();
     } catch (error) {
       if (['JsonWebTokenError', 'TokenExpiredError', 'NotBeforeError'].includes(error.name))
@@ -205,7 +275,7 @@ export function createApp({
         await audit(db, user, 'account.created', user.id, { role });
         return user;
       });
-      issue(res, user);
+      await issue(req, res, user);
       res.status(201).json({ user: cleanUser(user) });
     } catch (error) {
       if (error.code === '23505')
@@ -214,19 +284,64 @@ export function createApp({
     }
   });
   app.post('/api/auth/login', limiter, async (req, res) => {
-    const values = parse(login, req.body);
+    const values = parse(login.extend({ code: z.string().trim().max(40).default('') }), req.body);
+    const attemptKey = digest(secret + ':login:' + values.email + ':' + req.ip);
+    const attempt = (
+      await pool.query(
+        "INSERT INTO venue_app.auth_attempts(key,attempts) VALUES($1,1) ON CONFLICT(key) DO UPDATE SET attempts=CASE WHEN venue_app.auth_attempts.window_started_at<now()-interval '15 minutes' THEN 1 ELSE venue_app.auth_attempts.attempts+1 END,window_started_at=CASE WHEN venue_app.auth_attempts.window_started_at<now()-interval '15 minutes' THEN now() ELSE venue_app.auth_attempts.window_started_at END RETURNING attempts",
+        [attemptKey],
+      )
+    ).rows[0];
+    if (attempt.attempts > 10)
+      throw new HttpError(
+        429,
+        'Too many sign-in attempts for this account. Try again in 15 minutes.',
+      );
     const user = (
       await pool.query(
-        `SELECT ${userFields},password_hash,session_version,active FROM venue_app.users WHERE email=$1`,
+        `SELECT ${userFields},password_hash,session_version,active,mfa_secret,mfa_last_step,recovery_hashes FROM venue_app.users WHERE email=$1`,
         [values.email],
       )
     ).rows[0];
     const valid = await bcrypt.compare(values.password, user?.password_hash || fallbackHash);
     if (!user || !valid || !user.active)
       throw new HttpError(401, 'The email or password is incorrect.');
-    issue(res, user);
+    if (user.mfa_secret) {
+      if (!values.code)
+        throw new HttpError(428, 'Enter your authenticator or recovery code to finish signing in.');
+      await transaction(pool, async (db) => {
+        const locked = (
+          await db.query('SELECT * FROM venue_app.users WHERE id=$1 FOR UPDATE', [user.id])
+        ).rows[0];
+        if (!locked.active || locked.password_hash !== user.password_hash)
+          throw new HttpError(401, 'Please sign in again.');
+        await checkSecondFactor(db, locked, values.code, encryptionKey);
+      });
+    }
+    await pool.query('DELETE FROM venue_app.auth_attempts WHERE key=$1', [attemptKey]);
+    await issue(req, res, user);
     res.json({ user: cleanUser(user) });
   });
+  const ssoProvider =
+    oidcProvider ??
+    configuredOidc({
+      issuer: process.env.OIDC_ISSUER,
+      clientId: process.env.OIDC_CLIENT_ID,
+      clientSecret: process.env.OIDC_CLIENT_SECRET,
+      redirectUri: app.locals.siteUrl + '/api/auth/sso/callback',
+    });
+  app.locals.ssoEnabled = !!ssoProvider;
+  ssoRoutes(app, {
+    pool,
+    key: encryptionKey,
+    siteUrl: app.locals.siteUrl,
+    issue,
+    limiter,
+    production,
+    provider: ssoProvider,
+    domains: oidcDomains,
+  });
+  securityRoutes(app, { pool, key: encryptionKey, siteUrl: app.locals.siteUrl, issue, limiter });
   publicRoutes(app, { pool, writeLimiter });
   app.use('/api', (req, res, next) =>
     req.user ? next() : res.status(401).json({ message: 'Sign in to continue.' }),
@@ -236,41 +351,76 @@ export function createApp({
     await pool.query('UPDATE venue_app.users SET session_version=session_version+1 WHERE id=$1', [
       req.user.id,
     ]);
+    await pool.query(
+      'UPDATE venue_app.sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL',
+      [req.user.id],
+    );
     res.clearCookie('venue_session', { ...options, maxAge: undefined });
     res.json({ ok: true });
   });
   app.patch('/api/auth/password', limiter, async (req, res) => {
     const values = parse(
-      z.object({ currentPassword: z.string().min(1).max(128), newPassword: password }).strict(),
+      z
+        .object({
+          currentPassword: z.string().min(1).max(128),
+          newPassword: password,
+          code: z.string().trim().max(40).default(''),
+        })
+        .strict(),
       req.body,
     );
-    const stored = (
-      await pool.query('SELECT password_hash FROM venue_app.users WHERE id=$1', [req.user.id])
-    ).rows[0];
-    if (!(await bcrypt.compare(values.currentPassword, stored.password_hash)))
-      throw new HttpError(400, 'Your current password is incorrect.');
     const hash = await bcrypt.hash(values.newPassword, 12);
-    const updated = (
-      await pool.query(
-        'UPDATE venue_app.users SET password_hash=$1,session_version=session_version+1,updated_at=now() WHERE id=$2 RETURNING id,session_version',
-        [hash, req.user.id],
-      )
-    ).rows[0];
-    issue(res, updated);
-    await audit(pool, req.user, 'password.changed', req.user.id);
+    const updated = await transaction(pool, async (db) => {
+      const stored = (
+        await db.query('SELECT * FROM venue_app.users WHERE id=$1 FOR UPDATE', [req.user.id])
+      ).rows[0];
+      if (!(await bcrypt.compare(values.currentPassword, stored.password_hash)))
+        throw new HttpError(400, 'Your current password is incorrect.');
+      await checkSecondFactor(db, stored, values.code, encryptionKey);
+      const result = (
+        await db.query(
+          'UPDATE venue_app.users SET password_hash=$1,session_version=session_version+1,updated_at=now() WHERE id=$2 RETURNING id,session_version',
+          [hash, req.user.id],
+        )
+      ).rows[0];
+      await audit(db, req.user, 'password.changed', req.user.id);
+      return result;
+    });
+    await issue(req, res, updated);
     res.json({ ok: true });
   });
   app.use('/api', writeLimiter);
+  securityRoutes(app, {
+    pool,
+    key: encryptionKey,
+    siteUrl: app.locals.siteUrl,
+    issue,
+    limiter,
+    authenticated: true,
+  });
+  app.use('/api', (req, _res, next) => {
+    if (requireStaffMfa && req.user.role !== 'client' && !req.user.mfa_enabled)
+      return next(
+        new HttpError(
+          403,
+          'Set up two-factor authentication in Security before accessing the staff workspace.',
+        ),
+      );
+    next();
+  });
+  accessRoutes(app, { pool });
+  cardRoutes(app, { pool, stripe, siteUrl: app.locals.siteUrl });
+  enterpriseRoutes(app, { pool });
   bookingRoutes(app, { pool });
   workspaceRoutes(app, { pool });
   adminRoutes(app, { pool });
   app.use('/api', (_req, res) =>
     res.status(404).json({ message: 'This route could not be found.' }),
   );
-  app.use((error, _req, res, next) => {
+  app.use((error, req, res, next) => {
     if (res.headersSent) return next(error);
     if (error instanceof HttpError)
-      return res.status(error.status).json({ message: error.message });
+      return res.status(error.status).json({ message: error.message, requestId: req.requestId });
     if (error.type === 'entity.too.large')
       return res.status(413).json({ message: 'The uploaded information is too large.' });
     if (error.type === 'entity.parse.failed')
@@ -279,10 +429,11 @@ export function createApp({
       return res.status(409).json({ message: 'A record already uses those details.' });
     if (error.code === '23503')
       return res.status(409).json({ message: 'This record is still connected to other records.' });
-    console.error('API operation failed:', error.code || error.name);
-    res
-      .status(503)
-      .json({ message: 'The server could not complete this request. Please try again.' });
+    logger({ event: 'api.error', requestId: req.requestId, code: error.code || error.name });
+    res.status(503).json({
+      message: 'The server could not complete this request. Please try again.',
+      requestId: req.requestId,
+    });
   });
   return app;
 }
@@ -293,6 +444,7 @@ export function cleanUser(user) {
     email: user.email,
     role: user.role,
     created_at: user.created_at,
+    mfaEnabled: user.mfa_enabled ?? !!user.mfa_secret,
   };
 }
 export function slugify(value) {

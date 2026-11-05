@@ -23,6 +23,7 @@ const schema = z.object({
   name: z.string().max(100),
   email: z.string().max(254),
   password: z.string().max(128),
+  code: z.string().max(40),
   consent: z.boolean(),
 });
 type Fields = z.infer<typeof schema>;
@@ -74,6 +75,7 @@ export function BookingWizard({
   const [done, setDone] = useState<{ id: string; reference: string; starts_at: string } | null>(
     null,
   );
+  const returnFocus = useRef<HTMLElement | null>(null);
   const abort = useRef<AbortController | null>(null);
   const submission = useRef<{ key: string; fingerprint: string } | null>(null);
   const artists = (artistsQuery.data?.artists || []).filter(
@@ -118,6 +120,7 @@ export function BookingWizard({
       email: '',
       password: '',
       consent: false,
+      code: '',
     },
   });
   useEffect(() => {
@@ -141,6 +144,7 @@ export function BookingWizard({
         email: '',
         password: '',
         consent: false,
+        code: '',
       });
     } else {
       abort.current?.abort();
@@ -216,7 +220,7 @@ export function BookingWizard({
                     password: values.password,
                     role: 'client',
                   }
-                : { email: values.email, password: values.password },
+                : { email: values.email, password: values.password, code: values.code },
             ),
           },
           controller.signal,
@@ -273,7 +277,17 @@ export function BookingWizard({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content className="booking-dialog">
+        <Dialog.Content
+          className="booking-dialog"
+          onOpenAutoFocus={() => {
+            returnFocus.current =
+              document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            if (returnFocus.current?.isConnected) returnFocus.current.focus();
+          }}
+        >
           <Dialog.Close
             className="icon-button dialog-close"
             aria-label="Close booking"
@@ -653,6 +667,12 @@ export function BookingWizard({
                                 <span className="field-error">{errors.password.message}</span>
                               )}
                             </label>
+                            {!signup && (
+                              <label>
+                                Authenticator or recovery code
+                                <input {...register('code')} autoComplete="one-time-code" />
+                              </label>
+                            )}
                             <p className="fine-print">
                               Your account keeps your booking, reference images and artist
                               conversation together.

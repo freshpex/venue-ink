@@ -1,3 +1,5 @@
+import { Pagination } from './OperationsPanel';
+import type { PageData } from './OperationsPanel';
 import { useState } from 'react';
 import { useApi, dateTime } from '../../lib/queries';
 import { request } from '../../lib/api';
@@ -11,11 +13,13 @@ import manifest from '../../data/image-manifest.json';
 export function UsersPanel() {
   const [search, setSearch] = useState('');
   const [role, setRole] = useState('all');
+  const [page, setPage] = useState(1);
   const [createRole, setCreateRole] = useState('client');
   const [created, setCreated] = useState('');
   const profile = useApi<ProfileData>('/profile');
-  const query = useApi<{ users: (User & { active: boolean })[] }>(
-    '/admin/users?search=' + encodeURIComponent(search),
+  const query = useApi<{ users: (User & { active: boolean })[]; pagination: PageData }>(
+    '/admin/users?' +
+      new URLSearchParams({ search, page: String(page), ...(role !== 'all' ? { role } : {}) }),
   );
   return (
     <section className="workspace-card">
@@ -97,7 +101,14 @@ export function UsersPanel() {
       {created && <p role="status">Created {created}. The account owner can now sign in.</p>}
       <label>
         Filter by role
-        <select aria-label="Filter by role" value={role} onChange={(e) => setRole(e.target.value)}>
+        <select
+          aria-label="Filter by role"
+          value={role}
+          onChange={(e) => {
+            setRole(e.target.value);
+            setPage(1);
+          }}
+        >
           {['all', 'client', 'artist', 'studio', 'admin'].map((r) => (
             <option key={r} value={r}>
               {r === 'all' ? 'All roles' : r}
@@ -109,7 +120,10 @@ export function UsersPanel() {
         <input
           aria-label="Search accounts"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
           placeholder="Find a name or email"
         />
       </label>
@@ -160,6 +174,7 @@ export function UsersPanel() {
             </details>
           ))
       )}
+      <Pagination data={query.data?.pagination} onPage={setPage} />
     </section>
   );
 }
@@ -541,7 +556,9 @@ export function SiteSettings() {
   );
 }
 export function AuditPanel() {
+  const [page, setPage] = useState(1);
   const query = useApi<{
+    pagination: PageData;
     entries: {
       id: string;
       actor_name: string;
@@ -549,7 +566,7 @@ export function AuditPanel() {
       entity_name: string;
       created_at: string;
     }[];
-  }>('/admin/audit');
+  }>('/admin/audit?page=' + page);
   return (
     <section className="workspace-card">
       <h2>Accountability, in order.</h2>
@@ -570,6 +587,7 @@ export function AuditPanel() {
           </div>
         ))
       )}
+      <Pagination data={query.data?.pagination} onPage={setPage} />
     </section>
   );
 }

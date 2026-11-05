@@ -12,7 +12,7 @@ For a production build, run `npm run build`. Set `NODE_ENV=production`, `CLIENT_
 
 ## Workflows
 
-- Client, artist and studio registration; secure HttpOnly sessions; password visibility controls; password changes; session revocation.
+- Client, artist and studio registration; secure HttpOnly sessions; password changes; per-device and all-device session revocation; authenticator MFA and recovery codes.
 - Published artist/studio pages, themes, service menu, availability and original artwork uploads.
 - Booking requests with private references, timezone-aware slots, review, conflict-protected confirmation, rescheduling, cancellation and completion.
 - Persisted booking conversations, notifications, saved artwork and personal ideas.
@@ -27,14 +27,14 @@ Uploaded images are compressed in the browser and stored durably in PostgreSQL (
 
 Run `npm run format`, `npm run format:check`, `npm run lint`, `npm test`, `npm run build` and `npm run test:e2e`. API integration tests use temporary accounts and records in the configured application schema and remove only their own records.
 
-## Administration and remaining enterprise work
+## Administration and enterprise operations
 
-Administrators use **Accounts & access → Create an account** for clients, artists, studio owners and other administrators. Artists can join an existing studio or receive a new one. Studio owners receive a studio without becoming a bookable artist automatically. Initial passwords must be shared privately; the owner can change them in My account. Creating another account preserves the administrator's session.
+Administrators use **Accounts & access → Create an account** for clients, artists, studio owners and administrators. Artists can join an existing studio or receive a new one. Studio owners receive a studio without becoming a bookable artist automatically. New admin-created profiles and studios start unpublished. Use Artists to review public names and open books, Studios to publish the studio and Services to set its menu. The artist sets working hours.
 
-New admin-created artist profiles and studios start unpublished; books start closed. Use **Artists** to review the public name and visibility, **Studios** to publish the studio, and **Services** to set its menu. The artist sets working hours in their own workspace. Booking requires published profiles, an active service and availability. Existing test-looking display names are stored data: review and rename or unpublish them under Artists rather than inventing real identities or deleting associated bookings.
+The platform includes authenticator MFA and one-use recovery codes, revocable browser sessions, expiring password reset and email verification, organization OIDC sign-in for provisioned accounts, delegated studio permissions, an encrypted email outbox with retries and appointment reminders, optional Stripe-hosted checkout and signed receipt/refund webhooks, paginated account/booking/activity screens, financial reports and CSV export, account data export and privacy case management. Admin → Operations shows configuration and delivery status.
 
-This is an operational foundation, not a complete enterprise platform. Material remaining work includes SSO/MFA and verified-email recovery; fine-grained team permissions beyond the four account roles; automated transactional email and reminders; a payment provider with webhooks/refunds and financial reconciliation (current payments are manually verified enquiries); paginated reporting beyond existing collection limits; and production monitoring, backup/restore verification and retention controls. These require implementation and environment-specific verification before enterprise readiness can be claimed.
+Optional integrations remain disabled until configured. Production startup requires a stable DATA_ENCRYPTION_KEY; the Render blueprint enables mandatory staff MFA. Existing sessions must sign in again after the enterprise migration.
 
-The isolated admin API suite can run without the configured database:
-`npx vitest run tests/admin.test.mjs tests/connection.test.ts tests/transaction.test.mjs`.
-It checks authorization, account provisioning for each role, named studio assignment, publishing restrictions and session protections against an in-memory PostgreSQL adapter. The full API suite still requires PostgreSQL and browser tests require Playwright browsers.
+See [operations and deployment](docs/OPERATIONS.md) for provider setup, tenant permission boundaries, monitoring, recovery, privacy, backup/restore and known limits. See [the implementation audit](docs/ENTERPRISE_AUDIT.md) for verified evidence and production acceptance gaps. These controls do not by themselves certify an enterprise deployment.
+
+Run `npm run test:local` for the API/security suites against disposable real PostgreSQL without using configured databases or providers. Run `npm run build`, then `npm run test:local -- --e2e --project=chromium` for browser workflows. CI executes those checks plus lint and a production dependency audit.

@@ -3,7 +3,7 @@ export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
   workers: 1,
-  reporter:[['line'],['json',{outputFile:'artifacts/qa/e2e-results.json'}]],
+  reporter: [['line'], ['json', { outputFile: 'artifacts/qa/e2e-results.json' }]],
   timeout: 300000,
   expect: { timeout: 30000 },
   use: {
@@ -16,7 +16,13 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'], channel: 'chromium' },
+      use: {
+        ...devices['Desktop Chrome'],
+        channel: 'chromium',
+        ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH
+          ? { launchOptions: { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } }
+          : {}),
+      },
     },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
@@ -24,7 +30,7 @@ export default defineConfig({
   webServer: {
     command: 'node scripts/test-server.mjs',
     url: 'http://127.0.0.1:4173/api/health',
-    reuseExistingServer: true,
+    reuseExistingServer: process.env.VENUE_ISOLATED_TESTS !== 'true',
     timeout: 150000,
   },
 });

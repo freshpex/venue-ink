@@ -1,60 +1,26 @@
 import { beforeAll, afterAll, it, expect } from 'vitest';
-import { newDb } from 'pg-mem';
-import { readFileSync } from 'node:fs';
+import { fixture } from './helpers/platform.mjs';
+
 import { randomUUID } from 'node:crypto';
-import bcrypt from 'bcryptjs';
+
 import supertest from 'supertest';
-import { createApp } from '../server/app.mjs';
 
 let pool, app, admin, client, adminId, studio, artist;
 const origin = 'http://127.0.0.1:5173';
 const password = 'AdminCreationTest42!';
 const mutation = (req) => req.set('Origin', origin).set('X-Requested-With', 'VenueWorkspace');
+let f;
 beforeAll(async () => {
-  const db = newDb();
-  db.public.registerFunction({
-    name: 'pg_advisory_xact_lock',
-    args: ['integer'],
-    returns: 'integer',
-    implementation: () => 1,
-  });
-  db.public.none(
-    readFileSync(new URL('../server/migrations/0000_venue_platform.sql', import.meta.url), 'utf8'),
-  );
-  const pg = db.adapters.createPg();
-  pool = new pg.Pool();
-  adminId = randomUUID();
-  await pool.query(
-    'INSERT INTO venue_app.users(id,name,email,password_hash,role) VALUES($1,$2,$3,$4,$5)',
-    [adminId, 'Platform Owner', 'owner@venue.test', await bcrypt.hash(password, 4), 'admin'],
-  );
-  await pool.query("INSERT INTO venue_app.settings(id) VALUES('site')");
-  app = createApp({
-    pool,
-    secret: 'isolated-admin-test-secret-more-than-32-chars',
-    origins: [origin],
-    limit: 1000,
-  });
-  admin = supertest.agent(app);
-  expect(
-    (await mutation(admin.post('/api/auth/login')).send({ email: 'owner@venue.test', password }))
-      .status,
-  ).toBe(200);
-  client = supertest.agent(app);
-  expect(
-    (
-      await mutation(client.post('/api/auth/register')).send({
-        name: 'A Client',
-        email: 'client@venue.test',
-        password,
-        role: 'client',
-      })
-    ).status,
-  ).toBe(201);
-}, 30000);
+  f = await fixture();
+  pool = f.pool;
+  app = f.app;
+  admin = f.admin;
+  client = f.client.agent;
+  adminId = (await admin.get('/api/auth/me')).body.user.id;
+}, 60000);
 afterAll(async () => {
-  await pool?.end();
-});
+  await f?.cleanup();
+}, 60000);
 
 it('only administrators can create accounts or manage artist publication', async () => {
   expect((await mutation(supertest(app).post('/api/admin/users')).send({})).status).toBe(401);
@@ -76,6 +42,7 @@ it('creates every account role without replacing the administrator session or ex
         : {}),
     });
     expect(response.status, JSON.stringify(response.body)).toBe(201);
+    f.users.push(response.body.user.id);
     expect(response.body.user.password_hash).toBeUndefined();
     expect(response.body.user.role).toBe(role);
     if (role === 'studio')
@@ -126,6 +93,7 @@ it('attaches an artist to a named existing studio without creating a duplicate s
     studioId: studio.id,
   });
   expect(result.status).toBe(201);
+  f.users.push(result.body.user.id);
   const profile = (
     await pool.query('SELECT * FROM venue_app.artist_profiles WHERE user_id=$1', [
       result.body.user.id,

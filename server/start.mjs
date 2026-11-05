@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve, sep } from 'node:path';
 import { createPool, migrateDatabase } from './db.mjs';
 import { seedDatabase } from './seed.mjs';
+import { startOperations, resendTransport } from './mail.mjs';
 import { createApp } from './app.mjs';
 if (!process.env.DATABASE_URL || !process.env.JWT_SECRET) {
   console.error('DATABASE_URL and JWT_SECRET are required.');
@@ -19,6 +20,30 @@ const origins = (
 const production = process.env.NODE_ENV === 'production';
 if (production && (!process.env.CLIENT_ORIGINS || origins.some((o) => !o.startsWith('https://')))) {
   console.error('Production requires explicit HTTPS CLIENT_ORIGINS.');
+  process.exit(1);
+}
+if (
+  production &&
+  (!process.env.DATA_ENCRYPTION_KEY || process.env.DATA_ENCRYPTION_KEY.length < 32)
+) {
+  console.error('Production requires a stable DATA_ENCRYPTION_KEY of at least 32 characters.');
+  process.exit(1);
+}
+const siteUrl = process.env.SITE_URL || origins[0];
+try {
+  const url = new URL(siteUrl);
+  if (
+    production &&
+    (url.protocol !== 'https:' ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      url.pathname !== '/')
+  )
+    throw new Error();
+} catch {
+  console.error('SITE_URL must be a valid site origin, using HTTPS in production.');
   process.exit(1);
 }
 const migrationPool = createPool(process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL, {
@@ -43,12 +68,36 @@ if (!ready) {
   process.exit(1);
 }
 const pool = createPool();
-const app = createApp({ pool, secret: process.env.JWT_SECRET, origins, production,securityHeaders:production||process.env.SECURITY_HEADERS==='true' });
+const app = createApp({
+  pool,
+  secret: process.env.JWT_SECRET,
+  origins,
+  production,
+  securityHeaders: production || process.env.SECURITY_HEADERS === 'true',
+});
+const stopWorker =
+  process.env.NODE_ENV === 'test' || process.env.WORKER_ENABLED === 'false'
+    ? async () => {}
+    : startOperations(pool, {
+        key: app.locals.encryptionKey,
+        siteUrl: siteUrl.replace(/\/$/, ''),
+        transport:
+          process.env.RESEND_API_KEY && process.env.MAIL_FROM
+            ? (message, options) =>
+                resendTransport(message, {
+                  apiKey: process.env.RESEND_API_KEY,
+                  from: process.env.MAIL_FROM,
+                  signal: options?.signal,
+                })
+            : null,
+      });
 const publicDirectory = fileURLToPath(new URL('../public', import.meta.url));
 const dist = fileURLToPath(new URL('../dist', import.meta.url));
 if ((production || process.env.SERVE_DIST === 'true') && existsSync(`${dist}/index.html`)) {
   app.get(/^(?!\/api(?:\/|$)).*/, (req, res, next) => {
-    if (/^\/(admin|dashboard|bookings|workspace|login|register)(\/|$)/.test(req.path)) {
+    if (
+      /^\/(admin|dashboard|bookings|workspace|login|register|account-access)(\/|$)/.test(req.path)
+    ) {
       res.set('Cache-Control', 'no-store');
       res.set('X-Robots-Tag', 'noindex,nofollow');
       return next();
@@ -66,6 +115,7 @@ const server = app.listen(Number(process.env.PORT) || 3001, '0.0.0.0', () =>
 for (const signal of ['SIGTERM', 'SIGINT'])
   process.on(signal, () => {
     server.close(async () => {
+      await stopWorker();
       await pool.end();
       process.exit(0);
     });

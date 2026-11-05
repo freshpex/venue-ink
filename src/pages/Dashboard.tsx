@@ -1,3 +1,12 @@
+import { SecurityPanel } from '../features/workspace/SecurityPanel';
+import {
+  OperationsPanel,
+  AccessPanel,
+  ReportsPanel,
+  PrivacyPanel,
+  Pagination,
+} from '../features/workspace/OperationsPanel';
+import type { PageData } from '../features/workspace/OperationsPanel';
 import { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -8,6 +17,7 @@ import { Loading, Failure, Empty } from '../components/AsyncState';
 import { useApi, useSession, useRefresh, dateTime, money } from '../lib/queries';
 import { request } from '../lib/api';
 import type { ProfileData } from '../features/workspace/AccountPanel';
+import { CardRefundForm } from '../features/payments/CardRefundForm';
 import type { Booking, Payment, Notification } from '../lib/types';
 import { AccountPanel, AvailabilityPanel } from '../features/workspace/AccountPanel';
 import {
@@ -28,9 +38,20 @@ import {
 } from '../features/workspace/AdminPanel';
 import { SaveForm, str, cents } from '../features/workspace/Forms';
 function BookingList({ calendar = false }: { calendar?: boolean }) {
-  const query = useApi<{ bookings: Booking[] }>('/bookings', { interval: 30000 });
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const query = useApi<{ bookings: Booking[]; pagination: PageData }>(
+    '/bookings-search?' +
+      new URLSearchParams({
+        page: String(page),
+        ...(search ? { search } : {}),
+        ...(status !== 'all' ? { status } : {}),
+        ...(calendar ? { month } : {}),
+      }),
+    { interval: 30000 },
+  );
   const items =
     query.data?.bookings
       .filter(
@@ -44,6 +65,15 @@ function BookingList({ calendar = false }: { calendar?: boolean }) {
       <div className="section-heading">
         <h2>{calendar ? 'Room in your calendar.' : 'Your bookings.'}</h2>
         <div className="workspace-filters">
+          <input
+            aria-label="Search bookings"
+            placeholder="Client, artist, studio or request"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+          />
           {calendar && (
             <label>
               Month
@@ -51,14 +81,20 @@ function BookingList({ calendar = false }: { calendar?: boolean }) {
                 aria-label="Calendar month"
                 type="month"
                 value={month}
-                onChange={(e) => setMonth(e.target.value)}
+                onChange={(e) => {
+                  setMonth(e.target.value);
+                  setPage(1);
+                }}
               />
             </label>
           )}
           <select
             aria-label="Booking status"
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            onChange={(e) => {
+              setStatus(e.target.value);
+              setPage(1);
+            }}
           >
             {['all', 'pending', 'confirmed', 'completed', 'declined', 'cancelled'].map((s) => (
               <option key={s} value={s}>
@@ -102,6 +138,7 @@ function BookingList({ calendar = false }: { calendar?: boolean }) {
           ))}
         </div>
       )}
+      <Pagination data={query.data?.pagination} onPage={setPage} />
     </section>
   );
 }
@@ -171,6 +208,7 @@ function Overview() {
   );
 }
 function PaymentsPanel({ staff }: { staff: boolean }) {
+  const session = useSession();
   const query = useApi<{ payments: Payment[] }>('/payments');
   return (
     <section className="workspace-card">
@@ -194,10 +232,18 @@ function PaymentsPanel({ staff }: { staff: boolean }) {
             <p>
               {payment.title} · {payment.purpose}
             </p>
-            <Link className="arrow-link" to={'/bookings/' + payment.booking_id}>
-              Open booking ↗
-            </Link>
+            {payment.can_open_booking !== false && (
+              <Link className="arrow-link" to={'/bookings/' + payment.booking_id}>
+                Open booking ↗
+              </Link>
+            )}
             {payment.receipt_reference && <p>Receipt: {payment.receipt_reference}</p>}
+            {!!payment.refunded_cents && (
+              <p>Refunded: {money(payment.refunded_cents, payment.currency)}</p>
+            )}
+            {session.data?.role === 'admin' &&
+              payment.provider_payment_id &&
+              payment.status === 'received' && <CardRefundForm payment={payment} />}
             {staff && payment.status === 'requested' && (
               <SaveForm
                 fields={[
@@ -285,6 +331,9 @@ function IdeasPanel() {
 }
 export default function Dashboard() {
   const session = useSession();
+  const security = useApi<{ requireStaffMfa: boolean; mfaEnabled: boolean }>('/security', {
+    enabled: !!session.data,
+  });
   const workspace = useApi<ProfileData>('/profile', {
     enabled: !!session.data && session.data.role !== 'client',
   });
@@ -307,48 +356,57 @@ export default function Dashboard() {
   const admin = user.role === 'admin';
   const staff = user.role !== 'client';
   if (location.pathname === '/admin' && !admin) return <Navigate to="/dashboard" replace />;
-  const tabs = admin
-    ? [
-        ['overview', 'Platform overview'],
-        ['users', 'Accounts & access'],
-        ['artists', 'Artists'],
-        ['studio', 'Studios'],
-        ['services', 'Services'],
-        ['team', 'Teams & invitations'],
-        ['events', 'Events'],
-        ['bookings', 'All bookings & messages'],
-        ['calendar', 'Booking calendar'],
-        ['payments', 'Payment verification'],
-        ['inbox', 'Support inbox'],
-        ['journal', 'Journal'],
-        ['settings', 'Site settings'],
-        ['audit', 'Activity log'],
-        ['profile', 'My account'],
-      ]
-    : [
-        ['overview', 'Overview'],
-        ['bookings', 'Bookings & messages'],
-        ['calendar', 'Calendar'],
-        ['payments', 'Payments'],
-        ...(user.role === 'client' ? [['ideas', 'Ideas']] : []),
-        ...(user.role === 'artist'
-          ? [
-              ['availability', 'Availability'],
-              ['artwork', 'Artwork'],
-            ]
-          : []),
-        ...(workspace.data?.studios.length
-          ? [
-              ['studio', 'Studio'],
-              ['services', 'Services'],
-              ['team', 'Team'],
-              ['events', 'Events'],
-            ]
-          : []),
-        ['support', 'Support'],
-        ['profile', 'My account'],
-      ];
-  const tab = tabs.some(([key]) => key === params.get('tab')) ? params.get('tab')! : 'overview';
+  const tabs =
+    security.data?.requireStaffMfa && !security.data.mfaEnabled
+      ? [['security', 'Security']]
+      : admin
+        ? [
+            ['overview', 'Platform overview'],
+            ['users', 'Accounts & access'],
+            ['artists', 'Artists'],
+            ['studio', 'Studios'],
+            ['services', 'Services'],
+            ['team', 'Teams & invitations'],
+            ['access', 'Studio permissions'],
+            ['events', 'Events'],
+            ['bookings', 'All bookings & messages'],
+            ['calendar', 'Booking calendar'],
+            ['payments', 'Payment verification'],
+            ['inbox', 'Support inbox'],
+            ['journal', 'Journal'],
+            ['settings', 'Site settings'],
+            ['audit', 'Activity log'],
+            ['operations', 'Operations'],
+            ['reports', 'Reports'],
+            ['privacy', 'Privacy requests'],
+            ['security', 'Security'],
+            ['profile', 'My account'],
+          ]
+        : [
+            ['overview', 'Overview'],
+            ['bookings', 'Bookings & messages'],
+            ['calendar', 'Calendar'],
+            ['payments', 'Payments'],
+            ...(user.role === 'client' ? [['ideas', 'Ideas']] : [['access', 'Studio permissions']]),
+            ...(user.role === 'artist'
+              ? [
+                  ['availability', 'Availability'],
+                  ['artwork', 'Artwork'],
+                ]
+              : []),
+            ...(workspace.data?.studios.length
+              ? [
+                  ['studio', 'Studio'],
+                  ['services', 'Services'],
+                  ['team', 'Team'],
+                  ['events', 'Events'],
+                ]
+              : []),
+            ['security', 'Security'],
+            ['support', 'Support'],
+            ['profile', 'My account'],
+          ];
+  const tab = tabs.some(([key]) => key === params.get('tab')) ? params.get('tab')! : tabs[0][0];
   return (
     <section className="workspace-shell">
       <aside className="workspace-sidebar">
@@ -421,7 +479,17 @@ export default function Dashboard() {
             </Link>
           </Button>
         </div>
-        {tab === 'overview' ? (
+        {tab === 'access' ? (
+          <AccessPanel />
+        ) : tab === 'security' ? (
+          <SecurityPanel />
+        ) : tab === 'operations' ? (
+          <OperationsPanel />
+        ) : tab === 'reports' ? (
+          <ReportsPanel />
+        ) : tab === 'privacy' ? (
+          <PrivacyPanel />
+        ) : tab === 'overview' ? (
           admin ? (
             <AdminOverview />
           ) : (
