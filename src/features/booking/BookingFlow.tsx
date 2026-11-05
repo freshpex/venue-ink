@@ -10,6 +10,7 @@ import { ArrowRight, ArrowLeft, Check, X, Upload, Eye, EyeOff, LoaderCircle } fr
 import { Button } from '../../components/ui/button';
 import { Loading, Failure } from '../../components/AsyncState';
 import { useApi, useSession, useRefresh, dateTime, money } from '../../lib/queries';
+import { finishSignIn } from '../../lib/session';
 import { request, waitForServer } from '../../lib/api';
 import { uploadImage } from '../../lib/upload';
 import type { Artist, Service, User } from '../../lib/types';
@@ -208,7 +209,7 @@ export function BookingWizard({
       await waitForServer(setStatus, controller.signal);
       if (!session.data) {
         setStatus(signup ? 'Creating your account…' : 'Signing you in…');
-        const auth = await request<{ user: User }>(
+        await request<{ user: User }>(
           signup ? '/auth/register' : '/auth/login',
           {
             method: 'POST',
@@ -225,7 +226,7 @@ export function BookingWizard({
           },
           controller.signal,
         );
-        client.setQueryData(['session'], auth.user);
+        await finishSignIn(client, controller.signal);
       }
       setStatus('Saving your reference images…');
       for (let index = uploaded.current.length; index < files.length; index++)

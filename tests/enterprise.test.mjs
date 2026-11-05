@@ -30,6 +30,21 @@ async function latestToken(userId, purpose) {
   }
   throw new Error('Token email not queued');
 }
+it('signs out only the current browser and preserves explicit sign-out-everywhere', async () => {
+  const account = await f.account('client');
+  const second = supertest.agent(f.app);
+  await f
+    .mutation(second.post('/api/auth/login'))
+    .send({ email: account.email, password: account.password });
+  expect((await f.mutation(account.agent.post('/api/auth/logout')).send({})).status).toBe(200);
+  expect((await account.agent.get('/api/auth/me')).status).toBe(401);
+  expect((await second.get('/api/auth/me')).status).toBe(200);
+  await f
+    .mutation(account.agent.post('/api/auth/login'))
+    .send({ email: account.email, password: account.password });
+  expect((await f.mutation(second.post('/api/security/revoke-all')).send({})).status).toBe(200);
+  expect((await account.agent.get('/api/auth/me')).status).toBe(401);
+});
 it('tracks browser sessions and revokes only the selected device', async () => {
   const account = await f.account('client');
   const second = supertest.agent(f.app);

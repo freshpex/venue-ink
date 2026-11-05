@@ -1,21 +1,16 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { request, ApiError, apiBase } from './api';
-import type { User } from './types';
+import { readSession } from './session';
 export function useSession() {
   return useQuery({
     queryKey: ['session'],
-    queryFn: async () => {
-      try {
-        return (await request<{ user: User }>('/auth/me')).user;
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 401) return null;
-        throw error;
-      }
-    },
+    queryFn: ({ signal }) => readSession(signal),
     retry: (count, error) =>
       error instanceof ApiError && [0, 503].includes(error.status) && count < 8,
     retryDelay: (attempt) => Math.min(1000 * (attempt + 1), 8000),
     staleTime: 30000,
+    refetchOnWindowFocus: 'always',
+    refetchOnReconnect: 'always',
   });
 }
 export function useApi<T>(
@@ -24,7 +19,7 @@ export function useApi<T>(
 ) {
   return useQuery({
     queryKey: ['api', path],
-    queryFn: () => request<T>(path),
+    queryFn: ({ signal }) => request<T>(path, {}, signal),
     enabled,
     retry: (count, error) =>
       error instanceof ApiError && [0, 503].includes(error.status) && count < 8,

@@ -7,6 +7,18 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 650,
     rollupOptions: {
+      onwarn(warning, warn) {
+        // Zod's prose comments quote PURE annotations; Rollup safely removes them.
+        if (
+          warning.code === 'INVALID_ANNOTATION' &&
+          /\/node_modules\/zod\/v4\/core\/(util|regexes)\.js$/.test(
+            (warning.id || '').replaceAll('\\', '/'),
+          ) &&
+          warning.message.includes('`@__PURE__`')
+        )
+          return;
+        warn(warning);
+      },
       output: {
         manualChunks(id) {
           if (!id.includes('node_modules')) return;

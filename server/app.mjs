@@ -35,6 +35,7 @@ export function createApp({
   siteUrl = process.env.SITE_URL || origins[0],
   requireStaffMfa = process.env.REQUIRE_STAFF_MFA === 'true',
   logger = production ? (entry) => console.info(JSON.stringify(entry)) : () => {},
+  isReady = () => true,
 }) {
   if (!secret || secret.length < 32)
     throw new Error('JWT_SECRET must contain at least 32 characters');
@@ -47,13 +48,15 @@ export function createApp({
     req.requestId = randomUUID();
     res.set('X-Request-Id', req.requestId);
     const start = performance.now();
+    const requestPath = req.path;
     res.on('finish', () => {
-      if (req.path.startsWith('/api'))
+      if (requestPath.startsWith('/api'))
         logger({
           event: 'http.request',
           requestId: req.requestId,
           method: req.method,
           route: req.route?.path || 'unmatched',
+          path: requestPath,
           status: res.statusCode,
           durationMs: Math.round(performance.now() - start),
         });
@@ -109,6 +112,11 @@ export function createApp({
     next();
   });
   app.get('/api/health/live', (_req, res) => res.json({ alive: true, service: 'venue' }));
+  app.use('/api', (_req, res, next) => {
+    if (isReady()) return next();
+    res.set('Retry-After', '3');
+    res.status(503).json({ ready: false, message: 'The server is preparing your workspace.' });
+  });
   app.get('/api/health', async (_req, res) => {
     try {
       await pool.query('SELECT 1 FROM venue_app.settings LIMIT 1');
@@ -340,12 +348,9 @@ export function createApp({
   );
   app.get('/api/auth/me', (req, res) => res.json({ user: cleanUser(req.user) }));
   app.post('/api/auth/logout', async (req, res) => {
-    await pool.query('UPDATE venue_app.users SET session_version=session_version+1 WHERE id=$1', [
-      req.user.id,
-    ]);
     await pool.query(
-      'UPDATE venue_app.sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL',
-      [req.user.id],
+      'UPDATE venue_app.sessions SET revoked_at=now() WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL',
+      [req.sessionId, req.user.id],
     );
     res.clearCookie('venue_session', { ...options, maxAge: undefined });
     res.json({ ok: true });
