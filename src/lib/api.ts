@@ -89,3 +89,22 @@ export async function waitForServer(
     503,
   );
 }
+
+export async function download(path: string, filename: string) {
+  const response = await fetch(apiBase + '/api' + path, {
+    credentials: 'include',
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({ message: 'Download failed. Try again.' }));
+    throw new ApiError(data.message, response.status);
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

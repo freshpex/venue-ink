@@ -130,11 +130,15 @@ export async function fixture() {
         "DELETE FROM venue_app.notifications WHERE user_id=ANY($1::uuid[]) OR booking_id=ANY($2::uuid[]) OR split_part(body,':',1)=ANY($3::text[])",
         [ids, bookings, supportRefs],
       );
+      await pool.query(
+        'DELETE FROM venue_app.refunds WHERE payment_id IN (SELECT id FROM venue_app.payment_requests WHERE booking_id=ANY($1::uuid[]))',
+        [bookings],
+      );
       await pool.query('DELETE FROM venue_app.payment_requests WHERE booking_id=ANY($1::uuid[])', [
         bookings,
       ]);
       await pool.query('DELETE FROM venue_app.bookings WHERE id=ANY($1::uuid[])', [bookings]);
-      for (const table of ['saved_designs', 'ideas', 'support_requests'])
+      for (const table of ['saved_designs', 'ideas', 'support_requests', 'privacy_requests'])
         await pool.query('DELETE FROM venue_app.' + table + ' WHERE user_id=ANY($1::uuid[])', [
           ids,
         ]);

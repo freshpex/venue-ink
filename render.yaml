@@ -2,7 +2,7 @@ services:
   - type: web
     name: venue-platform
     runtime: node
-    plan: free
+    plan: starter
     buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
@@ -15,6 +15,12 @@ services:
         value: lax
       - key: JWT_SECRET
         generateValue: true
+      - key: DATA_ENCRYPTION_KEY
+        generateValue: true
+      - key: REQUIRE_STAFF_MFA
+        value: 'true'
+      - key: WORKER_ENABLED
+        value: 'true'
       - key: DATABASE_URL
         sync: false
       - key: CLIENT_ORIGINS

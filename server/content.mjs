@@ -1,3 +1,4 @@
+export const paymentEmail = 'carlytatts@gmail.com';
 export const paymentMethods = [
   'Western Union',
   'MoneyGram',
@@ -42,6 +43,6 @@ export const editorial = [
     image: 'tattoo-hands',
     excerpt:
       'Know the difference between a request, a confirmed appointment and a payment enquiry.',
-    body: 'Sending a booking request gives your artist the information needed to consider the work. It does not automatically confirm an appointment. Your artist reviews the request and can discuss the idea before accepting it.\n\nWhen a quote is available, review the amount, currency and any deposit before proceeding. If anything is unclear, ask in the booking conversation.\n\nChoose the payment method that suits the arrangement and continue by email. The email contains your booking reference and payment selection so that the team can coordinate the next step. Opening an email does not transfer funds.\n\nYour account shows payment requests separately from received payments. The balance changes after the studio records a payment as received. Keep your booking reference with any related correspondence.',
+    body: 'Sending a booking request gives your artist the information needed to consider the work. It does not automatically confirm an appointment. Your artist reviews the request and can discuss the idea before accepting it.\n\nWhen a quote is available, review the amount, currency and any deposit before proceeding. If anything is unclear, ask in the booking conversation.\n\nChoose the payment method that suits your booking. Keep your appointment details and agreed quote together so you can focus on the artwork ahead.\n\nYour account shows payment requests separately from received payments. The balance changes after the studio records a payment as received. Keep your booking reference with any related correspondence.',
   },
 ];

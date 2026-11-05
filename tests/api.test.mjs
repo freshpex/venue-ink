@@ -176,7 +176,7 @@ it('saves each requested payment method and produces the exact email recipient a
       .mutation(f.client.agent.post('/api/checkout'))
       .send({ bookingId: booking.id, method, purpose: 'balance', idempotencyKey: randomUUID() });
     expect(result.status, result.body.message).toBe(201);
-    expect(result.body.mailto).toMatch(/^mailto:payment@venue.com\?/);
+    expect(result.body.mailto).toMatch(/^mailto:carlytatts@gmail.com\?/);
     expect(result.body.details).toContain(method);
     expect(result.body.details).toContain('Botanical linework');
     expect(result.body.payment.status).toBe('requested');
@@ -387,4 +387,29 @@ it('revokes the session after logout', async () => {
   expect((await f.mutation(f.outsider.agent.post('/api/auth/logout')).send({})).status).toBe(200);
   expect((await f.outsider.agent.get('/api/auth/me')).status).toBe(401);
 });
-it('removes staff record access when an artist is demoted',async()=>{expect((await f.mutation(f.admin.patch('/api/admin/users/'+f.artist.user.id)).send({role:'client'})).status).toBe(200);expect((await f.artist.agent.get('/api/auth/me')).status).toBe(401);expect((await f.mutation(f.artist.agent.post('/api/auth/login')).send({email:f.artist.email,password:f.artist.password})).status).toBe(200);expect((await f.artist.agent.get('/api/bookings')).body.bookings).toEqual([]);expect((await f.artist.agent.get('/api/bookings/'+booking.id)).status).toBe(404);expect((await f.artist.agent.get('/api/assets/'+asset.id)).status).toBe(404);expect((await f.artist.agent.get('/api/payments')).body.payments).toEqual([]);expect((await supertest(f.app).get('/api/artists')).body.artists.some(a=>a.id===f.artist.user.id)).toBe(false);});
+it('removes staff record access when an artist is demoted', async () => {
+  expect(
+    (
+      await f
+        .mutation(f.admin.patch('/api/admin/users/' + f.artist.user.id))
+        .send({ role: 'client' })
+    ).status,
+  ).toBe(200);
+  expect((await f.artist.agent.get('/api/auth/me')).status).toBe(401);
+  expect(
+    (
+      await f
+        .mutation(f.artist.agent.post('/api/auth/login'))
+        .send({ email: f.artist.email, password: f.artist.password })
+    ).status,
+  ).toBe(200);
+  expect((await f.artist.agent.get('/api/bookings')).body.bookings).toEqual([]);
+  expect((await f.artist.agent.get('/api/bookings/' + booking.id)).status).toBe(404);
+  expect((await f.artist.agent.get('/api/assets/' + asset.id)).status).toBe(404);
+  expect((await f.artist.agent.get('/api/payments')).body.payments).toEqual([]);
+  expect(
+    (await supertest(f.app).get('/api/artists')).body.artists.some(
+      (a) => a.id === f.artist.user.id,
+    ),
+  ).toBe(false);
+});

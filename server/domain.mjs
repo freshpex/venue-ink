@@ -2,18 +2,24 @@ import { randomUUID } from 'node:crypto';
 import { HttpError } from './validation.mjs';
 export const userFields = 'id,email,name,role,created_at';
 export const isStaff = (user) => ['admin', 'studio', 'artist'].includes(user.role);
-export const bookingFields = `b.id,b.reference,b.client_id,b.artist_id,b.service_id,b.flash_id,b.event_id,b.title,b.notes,b.placement,b.size_note,b.starts_at,b.ends_at,b.status,b.quote_cents,b.deposit_cents,b.currency,b.cancellation_note,b.created_at,b.updated_at,s.name AS service_name,s.duration_minutes,a.display_name AS artist_name,a.slug AS artist_slug,st.name AS studio_name,st.timezone,u.name AS client_name,u.email AS client_email,(SELECT COALESCE(sum(p.amount_cents),0)::integer FROM venue_app.payment_requests p WHERE p.booking_id=b.id AND p.status='received') AS paid_cents`;
+export const bookingFields = `b.id,b.reference,b.client_id,b.artist_id,b.service_id,b.flash_id,b.event_id,b.title,b.notes,b.placement,b.size_note,b.starts_at,b.ends_at,b.status,b.quote_cents,b.deposit_cents,b.currency,b.cancellation_note,b.created_at,b.updated_at,s.name AS service_name,s.duration_minutes,a.display_name AS artist_name,a.slug AS artist_slug,st.id AS studio_id,st.name AS studio_name,st.timezone,u.name AS client_name,u.email AS client_email,(SELECT COALESCE(sum(p.amount_cents),0)::integer FROM venue_app.payment_requests p WHERE p.booking_id=b.id AND p.status='received') - (SELECT COALESCE(sum(r.amount_cents),0)::integer FROM venue_app.refunds r JOIN venue_app.payment_requests rp ON rp.id=r.payment_id WHERE rp.booking_id=b.id AND r.status='succeeded') AS paid_cents`;
 export const bookingJoins =
   'FROM venue_app.bookings b JOIN venue_app.services s ON s.id=b.service_id JOIN venue_app.artist_profiles a ON a.user_id=b.artist_id LEFT JOIN venue_app.studios st ON st.id=a.studio_id JOIN venue_app.users u ON u.id=b.client_id';
-export function bookingScope(user, start = 1) {
+export function bookingScope(user, start = 1, permission = 'bookings') {
+  const access = permission === 'payments' ? "'manager','finance'" : "'manager','receptionist'";
   if (user.role === 'admin') return { clause: 'true', params: [] };
   if (user.role === 'client') return { clause: `b.client_id=$${start}`, params: [user.id] };
   return {
-    clause: `(b.client_id=$${start} OR b.artist_id=$${start} OR st.owner_id=$${start})`,
+    clause: `(b.client_id=$${start} OR b.artist_id=$${start} OR st.owner_id=$${start} OR EXISTS(SELECT 1 FROM venue_app.studio_access sa WHERE sa.studio_id=st.id AND sa.user_id=$${start} AND sa.access_role IN (${access})))`,
     params: [user.id],
   };
 }
-export async function getBooking(db, bookingId, user, { lock = false, manage = false } = {}) {
+export async function getBooking(
+  db,
+  bookingId,
+  user,
+  { lock = false, manage = false, permission = 'bookings' } = {},
+) {
   if (lock) await db.query('SELECT id FROM venue_app.bookings WHERE id=$1 FOR UPDATE', [bookingId]);
   const result = await db.query(
     `SELECT ${bookingFields},st.owner_id AS studio_owner ${bookingJoins} WHERE b.id=$1`,
@@ -26,20 +32,27 @@ export async function getBooking(db, bookingId, user, { lock = false, manage = f
       user.role === 'admin' ||
       (isStaff(user) && row.artist_id === user.id) ||
       (isStaff(user) && row.studio_owner === user.id) ||
-      (!manage && row.client_id === user.id)
+      (!manage && row.client_id === user.id) ||
+      (isStaff(user) && (await canManageStudio(db, row.studio_id, user, permission)))
     )
   )
     throw new HttpError(404, 'Booking not found.');
   return row;
 }
-export async function canManageStudio(db, studioId, user) {
+export async function canManageStudio(db, studioId, user, permission = 'manage') {
+  const roles =
+    permission === 'payments'
+      ? ['manager', 'finance']
+      : permission === 'bookings'
+        ? ['manager', 'receptionist']
+        : ['manager'];
   if (user.role === 'admin') return true;
   return (
     (
-      await db.query('SELECT 1 FROM venue_app.studios WHERE id=$1 AND owner_id=$2', [
-        studioId,
-        user.id,
-      ])
+      await db.query(
+        'SELECT 1 FROM venue_app.studios st WHERE st.id=$1 AND (st.owner_id=$2 OR EXISTS(SELECT 1 FROM venue_app.studio_access sa WHERE sa.studio_id=st.id AND sa.user_id=$2 AND sa.access_role=ANY($3::text[])))',
+        [studioId, user.id, roles],
+      )
     ).rowCount > 0
   );
 }

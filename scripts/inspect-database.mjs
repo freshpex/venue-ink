@@ -11,7 +11,7 @@ try {
       secretConfigured: !!process.env.JWT_SECRET,
       secretLength: process.env.JWT_SECRET?.length,
       environmentKeys: Object.keys(process.env).filter((k) =>
-        /^(DATABASE|JWT|VITE_|CLIENT_|STRIPE|SMTP|RESEND|S3_|NEON_)/.test(k),
+        /^(DATABASE|JWT|VITE_|CLIENT_|SMTP|MAILJET|S3_|NEON_)/.test(k),
       ),
       tables: result.rows,
     }),

@@ -1652,3 +1652,42 @@
     animation-iteration-count: infinite !important;
   }
 }
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+.pagination-controls span {
+  font-size: 13px;
+}
+.secret-key,
+.recovery-codes pre {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 16px;
+  background: var(--bone);
+  border: 1px solid currentColor;
+  font-size: 14px;
+}
+.wrap-anywhere {
+  overflow-wrap: anywhere;
+}
+.account-access-page {
+  display: block;
+  min-height: 75vh;
+}
+.account-access-page .auth-form-wrap {
+  max-width: 650px;
+  margin: 0 auto;
+}
+
+.payment-mail-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 16px 0;
+}

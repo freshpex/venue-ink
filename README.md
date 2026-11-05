@@ -12,16 +12,22 @@ For a production build, run `npm run build`. Set `NODE_ENV=production`, `CLIENT_
 
 ## Workflows
 
-- Client, artist and studio registration; secure HttpOnly sessions; password visibility controls; password changes; session revocation.
+- Client, artist and studio registration; secure HttpOnly sessions; password changes; per-device and all-device session revocation; authenticator MFA and recovery codes.
 - Published artist/studio pages, themes, service menu, availability and original artwork uploads.
 - Booking requests with private references, timezone-aware slots, review, conflict-protected confirmation, rescheduling, cancellation and completion.
 - Persisted booking conversations, notifications, saved artwork and personal ideas.
 - Studio invitations, service management and event booking with capacity controls.
-- Checkout saves a payment enquiry and opens email to `payment@venue.com`. Methods: Western Union, MoneyGram, Bank Transfer, IBAN Bank Transfer, Apple Pay, PayPal, Apple iTunes and Cryptocurrency (BTC / ETH / USDT). Payment remains requested until staff verify receipt. No card or wallet credentials are collected.
-- Support enquiries, admin replies, account restrictions/roles, journal publishing, settings and an activity log.
+- Dedicated administration overview with platform counts, account creation for every role, named studio assignment, public artist name editing and publishing controls. Studio owners manage studios and teams; artist tools are shown to artists, with studio management available when they own a studio.
+- Support enquiries, admin replies, account restrictions/roles, journal publishing, settings and an activity log with readable record names.
 
 Uploaded images are compressed in the browser and stored durably in PostgreSQL (2 MB per image, 40 MB per user). Reference images are private; publishing a profile photograph or flash image makes that image public. The application does not use ephemeral Render disk for uploads.
 
 ## Verification
 
 Run `npm run format`, `npm run format:check`, `npm run lint`, `npm test`, `npm run build` and `npm run test:e2e`. API integration tests use temporary accounts and records in the configured application schema and remove only their own records.
+
+## Administration and enterprise operations
+
+Administrators use **Accounts & access → Create an account** for clients, artists, studio owners and administrators. Artists can join an existing studio or receive a new one. Studio owners receive a studio without becoming a bookable artist automatically. New admin-created profiles and studios start unpublished. Use Artists to review public names and open books, Studios to publish the studio and Services to set its menu. The artist sets working hours.
+
+Run `npm run test:local` for the API/security suites against disposable real PostgreSQL without using configured databases or providers. Run `npm run build`, then `npm run test:local -- --e2e --project=chromium` for browser workflows. CI executes those checks plus lint and a production dependency audit.

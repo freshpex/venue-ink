@@ -215,7 +215,7 @@ export default function Home() {
               {
                 icon: CreditCard,
                 title: 'Payments without the chase',
-                text: 'Choose your method. Coordinate by email.',
+                text: 'Clear quotes. Flexible payment choices.',
                 to: '/payments',
               },
               {
