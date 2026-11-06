@@ -124,6 +124,15 @@ it('provides an honest quote request when the amount has not yet been agreed', a
   expect(result.status).toBe(201);
   expect(result.body.payment.amount_cents).toBeNull();
   expect(result.body.details).toContain('Amount: Please provide a quote');
+  const deposit = await f.mutation(f.client.agent.post('/api/checkout')).send({
+    bookingId: other.body.booking.id,
+    purpose: 'deposit',
+    method: 'Bank Transfer',
+    idempotencyKey: randomUUID(),
+  });
+  expect(deposit.status).toBe(201);
+  expect(deposit.body.payment.amount_cents).toBe(3000);
+  expect(deposit.body.details).toContain('Amount: 30.00 USD');
 });
 it('updates existing settings through the forward migration', async () => {
   const db = await f.pool.connect();

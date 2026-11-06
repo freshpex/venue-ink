@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { StandardServices } from './StandardServices';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
@@ -171,56 +172,61 @@ export function ServicesPanel({ artistId }: { artistId?: string } = {}) {
     },
   ];
   return (
-    <div className="workspace-columns">
-      <section className="workspace-card">
-        <h2>Your service menu.</h2>
-        {query.data.services.map((item) => (
-          <button className="entity-row" key={item.id} onClick={() => setSelected(item)}>
-            <span>
-              <strong>{item.name}</strong>
-              <small>
-                {item.artist_name || 'Shared studio service'} · {item.studio_name} ·{' '}
-                {item.duration_minutes} minutes · {item.active ? 'Active' : 'Hidden'}
-              </small>
-            </span>
-            <span>{money(item.price_cents)} ↗</span>
-          </button>
-        ))}
-        <Button variant="outline" onClick={() => setSelected(null)}>
-          Add a service
-        </Button>
-      </section>
-      <section className="workspace-card">
-        <h2>{selected ? 'Edit service' : 'Add a service'}</h2>
-        {studioOptions.length ? (
-          <SaveForm
-            key={selected?.id || 'new'}
-            fields={fields}
-            onSave={async (data) => {
-              await request('/workspace/services' + (selected ? '/' + selected.id : ''), {
-                method: selected ? 'PUT' : 'POST',
-                body: JSON.stringify({
-                  studioId: str(data, 'studio'),
-                  artistId: str(data, 'artist') || null,
-                  name: str(data, 'name'),
-                  description: str(data, 'description'),
-                  category: str(data, 'category'),
-                  durationMinutes: num(data, 'duration'),
-                  priceCents: cents(data, 'price'),
-                  depositCents: cents(data, 'deposit') || 0,
-                  active: checked(data, 'active'),
-                }),
-              });
-              setSelected(null);
-            }}
-          />
-        ) : (
-          <p>
-            Ask an administrator to assign your artist profile to a studio before adding services.
-          </p>
-        )}
-      </section>
-    </div>
+    <>
+      {session.data?.role === 'admin' && (
+        <StandardServices artistId={artistId} artists={profile.data.serviceArtists || []} />
+      )}
+      <div className="workspace-columns">
+        <section className="workspace-card">
+          <h2>Your service menu.</h2>
+          {query.data.services.map((item) => (
+            <button className="entity-row" key={item.id} onClick={() => setSelected(item)}>
+              <span>
+                <strong>{item.name}</strong>
+                <small>
+                  {item.artist_name || 'Shared studio service'} · {item.studio_name} ·{' '}
+                  {item.duration_minutes} minutes · {item.active ? 'Active' : 'Hidden'}
+                </small>
+              </span>
+              <span>{money(item.price_cents)} ↗</span>
+            </button>
+          ))}
+          <Button variant="outline" onClick={() => setSelected(null)}>
+            Add a service
+          </Button>
+        </section>
+        <section className="workspace-card">
+          <h2>{selected ? 'Edit service' : 'Add a service'}</h2>
+          {studioOptions.length ? (
+            <SaveForm
+              key={selected?.id || 'new'}
+              fields={fields}
+              onSave={async (data) => {
+                await request('/workspace/services' + (selected ? '/' + selected.id : ''), {
+                  method: selected ? 'PUT' : 'POST',
+                  body: JSON.stringify({
+                    studioId: str(data, 'studio'),
+                    artistId: str(data, 'artist') || null,
+                    name: str(data, 'name'),
+                    description: str(data, 'description'),
+                    category: str(data, 'category'),
+                    durationMinutes: num(data, 'duration'),
+                    priceCents: cents(data, 'price'),
+                    depositCents: cents(data, 'deposit') || 0,
+                    active: checked(data, 'active'),
+                  }),
+                });
+                setSelected(null);
+              }}
+            />
+          ) : (
+            <p>
+              Ask an administrator to assign your artist profile to a studio before adding services.
+            </p>
+          )}
+        </section>
+      </div>
+    </>
   );
 }
 export function TeamPanel() {

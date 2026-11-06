@@ -19,6 +19,7 @@ import { securityRoutes } from './routes/security.mjs';
 import { checkSecondFactor, digest } from './security.mjs';
 import { enterpriseRoutes } from './routes/enterprise.mjs';
 import { adminRoutes } from './routes/admin.mjs';
+import { servicePresetRoutes } from './routes/service-presets.mjs';
 import { artistManagementRoutes } from './routes/artist-management.mjs';
 import { createProfileStorage } from './profile-storage.mjs';
 export function createApp({
@@ -421,6 +422,7 @@ export function createApp({
   workspaceRoutes(app, { pool });
   adminRoutes(app, { pool });
   artistManagementRoutes(app, { pool });
+  servicePresetRoutes(app, { pool });
   app.use('/api', (_req, res) =>
     res.status(404).json({ message: 'This route could not be found.' }),
   );

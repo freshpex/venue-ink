@@ -351,8 +351,8 @@ export function bookingRoutes(app, { pool }) {
       if (['cancelled', 'declined'].includes(booking.status))
         throw new HttpError(409, 'This booking is closed.');
       let amount = null;
-      if (booking.quote_cents !== null) {
-        const target = values.purpose === 'deposit' ? booking.deposit_cents : booking.quote_cents;
+      const target = values.purpose === 'deposit' ? booking.deposit_cents : booking.quote_cents;
+      if (target !== null) {
         amount = Math.max(0, target - booking.paid_cents);
         if (amount === 0)
           throw new HttpError(

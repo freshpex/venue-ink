@@ -1946,3 +1946,128 @@
     display: block;
   }
 }
+
+.standard-service-launcher > label {
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+.standard-service-launcher select {
+  padding: 0.8rem;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  background: white;
+}
+.preset-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.preset-list {
+  max-height: min(65vh, 680px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 0.25rem;
+  display: grid;
+  gap: 0.7rem;
+  margin: 1rem 0;
+}
+.preset-row {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  min-width: 0;
+}
+.service-presets .preset-row > summary {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  cursor: pointer;
+}
+.platform-form .preset-select {
+  margin: 0;
+  flex-direction: row;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+.preset-select input {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+}
+.preset-select strong {
+  overflow-wrap: anywhere;
+}
+.preset-select small,
+.preset-price small {
+  display: block;
+  font-size: 0.75rem;
+  margin-top: 0.4rem;
+  line-height: 1.5;
+}
+.preset-price {
+  text-align: right;
+  font-size: 0.9rem;
+}
+.preset-edit,
+.preset-note {
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+.preset-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+  border-top: 1px solid var(--line);
+}
+.preset-fields label {
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.preset-fields .preset-description {
+  grid-column: 1 / -1;
+}
+.preset-fields input:not([type='checkbox']),
+.preset-fields textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 0.7rem;
+  border: 1px solid var(--line);
+  background: var(--bone);
+}
+.preset-fields .check-field {
+  flex-direction: row;
+  display: flex;
+  align-items: center;
+  grid-column: 1 / -1;
+}
+@media (max-width: 640px) {
+  .preset-row > summary {
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    padding: 0.8rem;
+  }
+  .platform-form .preset-select {
+    flex-basis: 100%;
+  }
+  .preset-price {
+    text-align: left;
+    margin-left: 28px;
+  }
+  .preset-edit {
+    margin-left: auto;
+  }
+  .preset-fields {
+    grid-template-columns: 1fr;
+  }
+}

@@ -78,6 +78,7 @@ export default function Pricing() {
               .map((s) => (
                 <article key={s.id}>
                   <small>
+                    {s.artist_name ? s.artist_name + ' · ' : ''}
                     {s.studio_name} · {s.category}
                   </small>
                   <h3>{s.name}</h3>
@@ -87,7 +88,10 @@ export default function Pricing() {
                     {s.duration_minutes} minutes
                     {s.deposit_cents > 0 ? ' · Deposit ' + money(s.deposit_cents, s.currency) : ''}
                   </span>
-                  <Link className="arrow-link" to={'/booking?service=' + s.id}>
+                  <Link
+                    className="arrow-link"
+                    to={'/booking?service=' + s.id + (s.artist_id ? '&artist=' + s.artist_id : '')}
+                  >
                     Discuss this service
                     <ArrowUpRight size={17} />
                   </Link>

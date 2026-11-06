@@ -65,7 +65,8 @@ export function publicRoutes(app, { pool, writeLimiter }) {
   });
   app.get('/api/services', async (req, res) => {
     const params = [];
-    let condition = 's.active=true AND st.published=true';
+    let condition =
+      "s.active=true AND st.published=true AND (s.artist_id IS NULL OR (a.published=true AND a.deleted_at IS NULL AND u.active=true AND u.role IN ('artist','admin')))";
     if (req.query.studioId) {
       params.push(parse(id, req.query.studioId));
       condition += ' AND s.studio_id=$1';
@@ -77,7 +78,7 @@ export function publicRoutes(app, { pool, writeLimiter }) {
     res.json({
       services: (
         await pool.query(
-          `SELECT s.id,s.studio_id,s.artist_id,s.name,s.description,s.category,s.duration_minutes,s.price_cents,s.deposit_cents,s.currency,st.name AS studio_name FROM venue_app.services s JOIN venue_app.studios st ON st.id=s.studio_id WHERE ${condition} ORDER BY s.created_at`,
+          `SELECT s.id,s.studio_id,s.artist_id,s.name,s.description,s.category,s.duration_minutes,s.price_cents,s.deposit_cents,s.currency,st.name AS studio_name,a.display_name AS artist_name FROM venue_app.services s JOIN venue_app.studios st ON st.id=s.studio_id LEFT JOIN venue_app.artist_profiles a ON a.user_id=s.artist_id LEFT JOIN venue_app.users u ON u.id=a.user_id WHERE ${condition} ORDER BY s.created_at`,
           params,
         )
       ).rows,

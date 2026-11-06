@@ -84,13 +84,12 @@ export function BookingWizard({
   const artists = (artistsQuery.data?.artists || []).filter(
     (artist) => artist.books_open && (!(flashId || eventId) || !artistId || artist.id === artistId),
   );
-  const preferredStudio = servicesQuery.data?.services.find(
-    (service) => service.id === serviceId,
-  )?.studio_id;
-  const selectedArtist =
-    artistChoice || artistId
-      ? artists.find((a) => a.id === (artistChoice || artistId))
-      : artists.find((a) => a.studio_id === preferredStudio) || artists[0];
+  const preferredService = servicesQuery.data?.services.find((service) => service.id === serviceId);
+  const preferredStudio = preferredService?.studio_id;
+  const preferredArtist = artistChoice || artistId || preferredService?.artist_id;
+  const selectedArtist = preferredArtist
+    ? artists.find((a) => a.id === preferredArtist)
+    : artists.find((a) => a.studio_id === preferredStudio) || artists[0];
   const services = (servicesQuery.data?.services || []).filter(
     (s) =>
       s.studio_id === selectedArtist?.studio_id &&
