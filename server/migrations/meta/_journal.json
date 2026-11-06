@@ -29,6 +29,13 @@
       "when": 1793923200000,
       "tag": "0003_artist_workspace_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794009600000,
+      "tag": "0004_s3_assets",
+      "breakpoints": true
     }
   ]
 }

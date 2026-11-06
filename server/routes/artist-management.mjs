@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { parse, id, HttpError } from '../validation.mjs';
 import { transaction } from '../db.mjs';
+import { persistAsset } from '../asset-storage.mjs';
 import { audit, canManageStudio, bookingJoins, isStaff } from '../domain.mjs';
 
 export function artistManagementRoutes(app, { pool }) {
@@ -199,41 +200,37 @@ export function artistManagementRoutes(app, { pool }) {
     const assetId = randomUUID(),
       url = '/api/assets/' + assetId,
       storage = app.locals.profileStorage;
-    await transaction(pool, async (db) => {
-      const current = await authorizedTarget(db, target, req.user, true);
-      await db.query('SELECT id FROM venue_app.users WHERE id=$1 FOR UPDATE', [permission.ownerId]);
-      const usage = Number(
-        (
-          await db.query(
-            'SELECT COALESCE(sum(byte_size),0) AS bytes FROM venue_app.assets WHERE owner_id=$1',
-            [permission.ownerId],
-          )
-        ).rows[0].bytes,
-      );
-      if (usage + bytes.length > 40 * 1024 * 1024)
-        throw new HttpError(
-          409,
-          'This account’s image storage is full. Remove unused images before uploading more.',
-        );
-      await db.query(
-        'INSERT INTO venue_app.assets(id,owner_id,mime_type,filename,byte_size,data,public,bucket) VALUES($1,$2,$3,$4,$5,$6,true,$7)',
-        [assetId, permission.ownerId, v.mimeType, v.filename, bytes.length, bytes, storage.bucket],
-      );
-      if (kind === 'studio')
-        await db.query('UPDATE venue_app.studios SET image_url=$1 WHERE id=$2', [url, target.id]);
-      else {
-        await db.query('UPDATE venue_app.users SET image_url=$1,updated_at=now() WHERE id=$2', [
-          url,
-          target.id,
-        ]);
-        await db.query('UPDATE venue_app.artist_profiles SET image_url=$1 WHERE user_id=$2', [
-          url,
-          target.id,
-        ]);
-      }
-      await unpublishUnused(db, current.previous);
-      await audit(db, req.user, 'profile.photo.updated', target.id, { kind });
-    });
+    await persistAsset(
+      pool,
+      storage,
+      {
+        id: assetId,
+        ownerId: permission.ownerId,
+        bytes,
+        mimeType: v.mimeType,
+        filename: v.filename,
+        public: true,
+      },
+      async (db) => {
+        const current = await authorizedTarget(db, target, req.user, true);
+        if (current.ownerId !== permission.ownerId)
+          throw new HttpError(409, 'This profile changed. Please reload and try again.');
+        if (kind === 'studio')
+          await db.query('UPDATE venue_app.studios SET image_url=$1 WHERE id=$2', [url, target.id]);
+        else {
+          await db.query('UPDATE venue_app.users SET image_url=$1,updated_at=now() WHERE id=$2', [
+            url,
+            target.id,
+          ]);
+          await db.query('UPDATE venue_app.artist_profiles SET image_url=$1 WHERE user_id=$2', [
+            url,
+            target.id,
+          ]);
+        }
+        await unpublishUnused(db, current.previous);
+        await audit(db, req.user, 'profile.photo.updated', target.id, { kind });
+      },
+    );
     res.json({ imageUrl: url });
   };
   const remove = (kind) => async (req, res) => {

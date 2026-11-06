@@ -1,3 +1,4 @@
+import { readAsset } from '../asset-storage.mjs';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { parse, id, email, HttpError } from '../validation.mjs';
@@ -137,7 +138,7 @@ export function publicRoutes(app, { pool, writeLimiter }) {
     const assetId = parse(id, req.params.id);
     const asset = (
       await pool.query(
-        'SELECT id,owner_id,mime_type,public,bucket FROM venue_app.assets WHERE id=$1',
+        'SELECT id,owner_id,mime_type,public,bucket,storage_provider,storage_key,byte_size FROM venue_app.assets WHERE id=$1',
         [assetId],
       )
     ).rows[0];
@@ -156,8 +157,7 @@ export function publicRoutes(app, { pool, writeLimiter }) {
       }
     }
     if (!permitted) throw new HttpError(404, 'Image not found.');
-    const bytes = (await pool.query('SELECT data FROM venue_app.assets WHERE id=$1', [assetId]))
-      .rows[0].data;
+    const bytes = await readAsset(pool, app.locals.profileStorage, asset);
     res.set('Content-Type', asset.mime_type);
     res.set('Cross-Origin-Resource-Policy', 'cross-origin');
     res.set('Cache-Control', asset.public ? 'public,max-age=3600' : 'private,no-store');

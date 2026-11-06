@@ -7,6 +7,7 @@ import { seedDatabase } from './seed.mjs';
 import { startOperations, mailjetTransport } from './mail.mjs';
 import { createApp } from './app.mjs';
 import { verifyProfileStorage } from './profile-storage.mjs';
+import { startAssetCleanup } from './asset-storage.mjs';
 if (!process.env.DATABASE_URL || !process.env.JWT_SECRET) {
   console.error('DATABASE_URL and JWT_SECRET are required.');
   process.exit(1);
@@ -62,6 +63,7 @@ const app = createApp({
   isReady: () => ready,
 });
 let stopWorker = async () => {};
+let stopAssetCleanup = async () => {};
 const publicDirectory = fileURLToPath(new URL('../public', import.meta.url));
 const dist = fileURLToPath(new URL('../dist', import.meta.url));
 app.get('/venue-config.js', (_req, res) => {
@@ -108,6 +110,7 @@ for (const signal of ['SIGTERM', 'SIGINT'])
     shuttingDown = true;
     ready = false;
     server.close(async () => {
+      await stopAssetCleanup();
       await stopWorker();
       await pool.end();
       process.exit(0);
@@ -156,6 +159,7 @@ if (!ready) {
   console.error('The database could not be initialized.');
   process.exit(1);
 }
+stopAssetCleanup = startAssetCleanup(pool, app.locals.profileStorage);
 stopWorker =
   process.env.NODE_ENV === 'test' || process.env.WORKER_ENABLED === 'false'
     ? async () => {}

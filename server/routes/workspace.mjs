@@ -2,6 +2,7 @@ import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { z } from 'zod';
 import { parse, id, email, timezone, HttpError, serviceInput } from '../validation.mjs';
 import { transaction } from '../db.mjs';
+import { persistAsset, drainAssetDeletions } from '../asset-storage.mjs';
 import { bookingScope, bookingJoins, isStaff, canManageStudio, audit } from '../domain.mjs';
 import { assignService, managesService } from '../artist-services.mjs';
 export function workspaceRoutes(app, { pool }) {
@@ -100,10 +101,10 @@ export function workspaceRoutes(app, { pool }) {
       if (values.imageAssetId !== undefined) {
         if (values.imageAssetId) {
           const asset = (
-            await db.query('SELECT id FROM venue_app.assets WHERE id=$1 AND owner_id=$2', [
-              values.imageAssetId,
-              req.user.id,
-            ])
+            await db.query(
+              'SELECT id FROM venue_app.assets WHERE id=$1 AND owner_id=$2 FOR KEY SHARE',
+              [values.imageAssetId, req.user.id],
+            )
           ).rows[0];
           if (!asset) throw new HttpError(400, 'Upload a profile image to your own account.');
           await db.query('UPDATE venue_app.assets SET public=true WHERE id=$1', [asset.id]);
@@ -351,35 +352,17 @@ export function workspaceRoutes(app, { pool }) {
       (v.mimeType === 'image/webp' && webp)
     ))
       throw new HttpError(400, 'Choose a valid JPEG, PNG or WebP image.');
-    const asset = await transaction(pool, async (db) => {
-      await db.query('SELECT id FROM venue_app.users WHERE id=$1 FOR UPDATE', [req.user.id]);
-      const usage = Number(
-        (
-          await db.query(
-            'SELECT COALESCE(sum(byte_size),0) AS bytes FROM venue_app.assets WHERE owner_id=$1',
-            [req.user.id],
-          )
-        ).rows[0].bytes,
-      );
-      if (usage + bytes.length > 40 * 1024 * 1024)
-        throw new HttpError(
-          409,
-          'Your image storage is full. Remove unused images before uploading more.',
-        );
-      const saved = (
-        await db.query(
-          'INSERT INTO venue_app.assets(id,owner_id,mime_type,filename,byte_size,data) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,filename,byte_size',
-          [
-            randomUUID(),
-            req.user.id,
-            v.mimeType,
-            v.filename.replace(/[^a-zA-Z0-9._ -]/g, '').slice(0, 150) || 'reference',
-            bytes.length,
-            bytes,
-          ],
-        )
-      ).rows[0];
-      return saved;
+    const asset = {
+      id: randomUUID(),
+      filename: v.filename.replace(/[^a-zA-Z0-9._ -]/g, '').slice(0, 150) || 'reference',
+      byte_size: bytes.length,
+    };
+    await persistAsset(pool, app.locals.profileStorage, {
+      id: asset.id,
+      ownerId: req.user.id,
+      bytes,
+      mimeType: v.mimeType,
+      filename: asset.filename,
     });
     res.status(201).json({ asset: { ...asset, url: `/api/assets/${asset.id}` } });
   });
@@ -395,17 +378,23 @@ export function workspaceRoutes(app, { pool }) {
   );
   app.delete('/api/assets/:id', async (req, res) => {
     const assetId = parse(id, req.params.id);
-    const used = await pool.query(
-      'SELECT 1 FROM venue_app.booking_assets WHERE asset_id=$1 UNION ALL SELECT 1 FROM venue_app.flash_designs WHERE asset_id=$1 UNION ALL SELECT 1 FROM venue_app.artist_profiles WHERE image_url=$2 UNION ALL SELECT 1 FROM venue_app.users WHERE image_url=$2 UNION ALL SELECT 1 FROM venue_app.studios WHERE image_url=$2',
-      [assetId, `/api/assets/${assetId}`],
-    );
-    if (used.rowCount)
-      throw new HttpError(409, 'This image is in use by a booking or published work.');
-    const removed = await pool.query(
-      'DELETE FROM venue_app.assets WHERE id=$1 AND owner_id=$2 RETURNING id',
-      [assetId, req.user.id],
-    );
-    if (!removed.rowCount) throw new HttpError(404, 'Image not found.');
+    await transaction(pool, async (db) => {
+      const asset = (
+        await db.query('SELECT id FROM venue_app.assets WHERE id=$1 AND owner_id=$2 FOR UPDATE', [
+          assetId,
+          req.user.id,
+        ])
+      ).rows[0];
+      if (!asset) throw new HttpError(404, 'Image not found.');
+      const used = await db.query(
+        'SELECT 1 FROM venue_app.booking_assets WHERE asset_id=$1 UNION ALL SELECT 1 FROM venue_app.flash_designs WHERE asset_id=$1 UNION ALL SELECT 1 FROM venue_app.artist_profiles WHERE image_url=$2 UNION ALL SELECT 1 FROM venue_app.users WHERE image_url=$2 UNION ALL SELECT 1 FROM venue_app.studios WHERE image_url=$2',
+        [assetId, `/api/assets/${assetId}`],
+      );
+      if (used.rowCount)
+        throw new HttpError(409, 'This image is in use by a booking or published work.');
+      await db.query('DELETE FROM venue_app.assets WHERE id=$1', [assetId]);
+    });
+    await drainAssetDeletions(pool, app.locals.profileStorage).catch(() => {});
     res.json({ ok: true });
   });
   app.get('/api/workspace/flash', staff, async (req, res) =>

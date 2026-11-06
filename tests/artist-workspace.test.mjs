@@ -221,7 +221,7 @@ it('publishes administrator-uploaded artist and studio photographs and protects 
     (await f.mutation(f.outsider.agent.put('/api/studios/' + f.studio.id + '/photo')).send(image))
       .status,
   ).toBe(404);
-  expect((await f.mutation(f.admin.delete('/api/assets/' + url.split('/').pop()))).status).toBe(
+  expect((await f.mutation(other.agent.delete('/api/assets/' + url.split('/').pop()))).status).toBe(
     409,
   );
   expect((await f.mutation(f.admin.delete('/api/accounts/' + other.id + '/photo'))).status).toBe(

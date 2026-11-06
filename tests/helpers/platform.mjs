@@ -8,7 +8,7 @@ try {
 } catch {
   /* CI supplies environment variables directly. */
 }
-export async function fixture() {
+export async function fixture(options = {}) {
   const pool = createPool();
   const origin = 'http://127.0.0.1:5173';
   const app = createApp({
@@ -16,6 +16,7 @@ export async function fixture() {
     secret: 'venue-integration-tests-secret-32-characters',
     origins: [origin],
     limit: 1000,
+    ...options,
   });
   const users = [];
   const supportRefs = [];

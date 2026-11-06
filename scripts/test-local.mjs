@@ -7,6 +7,7 @@ import { createServer } from 'node:net';
 import { spawn } from 'node:child_process';
 import { createPool, migrateDatabase } from '../server/db.mjs';
 import { seedDatabase } from '../server/seed.mjs';
+import { s3Fixture } from '../tests/helpers/s3.mjs';
 
 const directory = await mkdtemp(join(tmpdir(), 'venue-tests-'));
 const socket = createServer();
@@ -24,7 +25,7 @@ const postgres = new EmbeddedPostgres({
   onLog: () => {},
   onError: () => {},
 });
-let child;
+let child, objectStorage;
 const stop = () => child?.kill('SIGTERM');
 process.on('SIGINT', stop);
 process.on('SIGTERM', stop);
@@ -41,6 +42,9 @@ try {
     SEED_ADMIN_EMAIL: 'admin@venue.com',
     SEED_ADMIN_PASSWORD: randomBytes(24).toString('hex'),
     REQUIRE_STAFF_MFA: 'false',
+    AWS_ENDPOINT_URL_S3: '',
+    AWS_ACCESS_KEY_ID: '',
+    AWS_SECRET_ACCESS_KEY: '',
     MAILJET_API_KEY: '',
     MAILJET_SECRET_KEY: '',
     MAILJET_FROM_EMAIL: '',
@@ -61,6 +65,11 @@ try {
   }
   console.log('Temporary PostgreSQL initialized. No configured database is used.');
   const args = process.argv.slice(2);
+  if (args.includes('--s3')) {
+    args.splice(args.indexOf('--s3'), 1);
+    objectStorage = await s3Fixture();
+    Object.assign(env, objectStorage.env);
+  }
   const e2e = args[0] === '--e2e';
   if (e2e) args.shift();
   child = spawn(
@@ -81,6 +90,7 @@ try {
   );
   process.exitCode = 1;
 } finally {
+  await objectStorage?.close();
   await postgres.stop().catch(() => {});
   await rm(directory, { recursive: true, force: true });
 }

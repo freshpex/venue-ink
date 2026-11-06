@@ -1,18 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { createAssetStorage } from './asset-storage.mjs';
 
 export function createProfileStorage(env = process.env) {
-  return { provider: 'database', bucket: env.PROFILE_STORAGE_BUCKET || 'profile' };
+  return createAssetStorage(env);
 }
 
 export async function verifyProfileStorage(storage, pool) {
+  const bytes = await readFile(new URL('./assets/profile-storage-probe.jpg', import.meta.url));
   const client = await pool.connect();
   let discard = false;
   try {
     await client.query('BEGIN');
     const ownerId = randomUUID(),
       assetId = randomUUID();
-    const bytes = await readFile(new URL('./assets/profile-storage-probe.jpg', import.meta.url));
     await client.query(
       "INSERT INTO venue_app.users(id,email,name,password_hash,role,active) VALUES($1,$2,'Storage verification','disabled-storage-probe','client',false)",
       [ownerId, 'storage-check-' + ownerId + '@venue.invalid'],
@@ -47,7 +48,6 @@ export async function verifyProfileStorage(storage, pool) {
     if (changed.rowCount !== 1 || removed.rowCount !== 1)
       throw new Error('Profile image storage lifecycle verification failed.');
     await client.query('DELETE FROM venue_app.users WHERE id=$1', [ownerId]);
-    return { provider: 'postgresql', bucket: storage.bucket, writeReadDeleteVerified: true };
   } finally {
     try {
       await client.query('ROLLBACK');
@@ -56,4 +56,20 @@ export async function verifyProfileStorage(storage, pool) {
     }
     client.release(discard ? new Error('Profile verification connection interrupted') : undefined);
   }
+  if (storage.provider === 's3') {
+    const key = `verification/${randomUUID()}.jpg`;
+    try {
+      await storage.put(key, bytes, 'image/jpeg');
+      if (!(await storage.get(key)).equals(bytes))
+        throw new Error('Object storage read verification failed.');
+      await storage.put(key, bytes, 'image/jpeg');
+    } finally {
+      await storage.remove(key);
+    }
+  }
+  return {
+    provider: storage.provider === 's3' ? 's3' : 'postgresql',
+    bucket: storage.bucket,
+    writeReadDeleteVerified: true,
+  };
 }
