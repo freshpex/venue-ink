@@ -98,7 +98,7 @@ export function createApp({
               formAction: ["'self'", 'https://*.tawk.to'],
               objectSrc: ["'none'"],
               frameAncestors: ["'none'"],
-              upgradeInsecureRequests: [],
+              upgradeInsecureRequests: production ? [] : null,
             },
           }
         : false,
