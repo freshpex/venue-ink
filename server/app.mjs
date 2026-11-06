@@ -19,6 +19,8 @@ import { securityRoutes } from './routes/security.mjs';
 import { checkSecondFactor, digest } from './security.mjs';
 import { enterpriseRoutes } from './routes/enterprise.mjs';
 import { adminRoutes } from './routes/admin.mjs';
+import { artistManagementRoutes } from './routes/artist-management.mjs';
+import { createProfileStorage } from './profile-storage.mjs';
 export function createApp({
   pool,
   secret,
@@ -37,12 +39,14 @@ export function createApp({
   requireStaffMfa = process.env.REQUIRE_STAFF_MFA === 'true',
   logger = production ? (entry) => console.info(JSON.stringify(entry)) : () => {},
   isReady = () => true,
+  profileStorage = createProfileStorage(),
 }) {
   if (!secret || secret.length < 32)
     throw new Error('JWT_SECRET must contain at least 32 characters');
   const app = express();
   app.disable('x-powered-by');
   app.locals.encryptionKey = encryptionKey;
+  app.locals.profileStorage = profileStorage;
   app.locals.siteUrl = siteUrl.replace(/\/$/, '');
   app.locals.requireStaffMfa = requireStaffMfa;
   app.use((req, res, next) => {
@@ -416,6 +420,7 @@ export function createApp({
   bookingRoutes(app, { pool });
   workspaceRoutes(app, { pool });
   adminRoutes(app, { pool });
+  artistManagementRoutes(app, { pool });
   app.use('/api', (_req, res) =>
     res.status(404).json({ message: 'This route could not be found.' }),
   );
@@ -446,6 +451,7 @@ export function cleanUser(user) {
     email: user.email,
     role: user.role,
     created_at: user.created_at,
+    image_url: user.image_url || null,
     mfaEnabled: user.mfa_enabled ?? !!user.mfa_secret,
   };
 }

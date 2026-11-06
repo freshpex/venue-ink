@@ -1,3 +1,5 @@
+import { StaffWorkspaceOverview, ClientsPanel } from '../features/workspace/StaffWorkspace';
+import { ProfileAvatar } from '../components/ProfilePhoto';
 import { SecurityPanel } from '../features/workspace/SecurityPanel';
 import {
   OperationsPanel,
@@ -37,6 +39,7 @@ import {
 } from '../features/workspace/AdminPanel';
 import { SaveForm, str, cents } from '../features/workspace/Forms';
 function BookingList({ calendar = false }: { calendar?: boolean }) {
+  const [filterParams] = useSearchParams();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
@@ -46,6 +49,7 @@ function BookingList({ calendar = false }: { calendar?: boolean }) {
       new URLSearchParams({
         page: String(page),
         ...(search ? { search } : {}),
+        ...(filterParams.get('client') ? { clientId: filterParams.get('client')! } : {}),
         ...(status !== 'all' ? { status } : {}),
         ...(calendar ? { month } : {}),
       }),
@@ -382,7 +386,13 @@ export default function Dashboard() {
             ['bookings', 'Bookings & messages'],
             ['calendar', 'Calendar'],
             ['payments', 'Payments'],
-            ...(user.role === 'client' ? [['ideas', 'Ideas']] : [['access', 'Studio permissions']]),
+            ...(user.role === 'client'
+              ? [['ideas', 'Ideas']]
+              : [
+                  ['clients', 'Clients'],
+                  ['services', 'Services'],
+                  ['access', 'Studio permissions'],
+                ]),
             ...(user.role === 'artist'
               ? [
                   ['availability', 'Availability'],
@@ -392,7 +402,6 @@ export default function Dashboard() {
             ...(workspace.data?.studios.length
               ? [
                   ['studio', 'Studio'],
-                  ['services', 'Services'],
                   ['team', 'Team'],
                   ['events', 'Events'],
                 ]
@@ -418,7 +427,11 @@ export default function Dashboard() {
           </span>
         </div>
         <div className="workspace-user">
-          <span className="avatar large">{user.name[0]}</span>
+          <ProfileAvatar
+            name={user.name}
+            image={workspace.data?.profile?.image_url || user.image_url}
+            large
+          />
           <strong>{user.name}</strong>
           <small>{user.role}</small>
         </div>
@@ -459,7 +472,13 @@ export default function Dashboard() {
         <div className="workspace-title">
           <div>
             <span className="workspace-kicker">
-              {admin ? 'VENUE ADMINISTRATION' : 'YOUR CREATIVE SPACE'}
+              {admin
+                ? 'VENUE ADMINISTRATION'
+                : user.role === 'artist'
+                  ? 'ARTIST WORKSPACE'
+                  : user.role === 'studio'
+                    ? 'STUDIO OPERATIONS'
+                    : 'YOUR CREATIVE SPACE'}
             </span>
             <h1>
               {tab === 'overview'
@@ -468,9 +487,11 @@ export default function Dashboard() {
             </h1>
           </div>
           <Button asChild variant="dark">
-            <Link to={admin ? '/admin?tab=users' : '/booking'}>
+            <Link
+              to={admin ? '/admin?tab=artists' : staff ? '/dashboard?tab=services' : '/booking'}
+            >
               <CalendarDays size={17} />
-              {admin ? 'Manage accounts' : 'Make a booking'}
+              {admin ? 'Manage artists' : staff ? 'Add a service' : 'Make a booking'}
             </Link>
           </Button>
         </div>
@@ -487,9 +508,13 @@ export default function Dashboard() {
         ) : tab === 'overview' ? (
           admin ? (
             <AdminOverview />
+          ) : staff ? (
+            <StaffWorkspaceOverview />
           ) : (
             <Overview />
           )
+        ) : tab === 'clients' ? (
+          <ClientsPanel />
         ) : tab === 'bookings' ? (
           <BookingList />
         ) : tab === 'calendar' ? (

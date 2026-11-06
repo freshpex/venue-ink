@@ -1,3 +1,4 @@
+import { ProfileAvatar } from '../components/ProfilePhoto';
 import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowUpRight, CalendarDays, MapPin, Copy, PenTool } from 'lucide-react';
@@ -174,7 +175,15 @@ export function StudioProfile() {
         text={query.data.studio.bio}
       />
       <section className="container studio-profile-page">
-        <Photo name="studio-community" alt="A creative studio environment" />
+        {query.data.studio.image_url ? (
+          <img
+            className="studio-cover"
+            src={assetUrl(query.data.studio.image_url)}
+            alt={query.data.studio.name + ' studio photograph'}
+          />
+        ) : (
+          <Photo name="studio-community" alt="A creative studio environment" />
+        )}
         {query.data.studio.location && (
           <p>
             <MapPin size={17} />
@@ -185,7 +194,7 @@ export function StudioProfile() {
         <div className="studio-artist-list">
           {query.data.artists.map((artist) => (
             <Link to={`/artists/${artist.slug}`} key={artist.id}>
-              <span className="avatar large">{artist.display_name[0]}</span>
+              <ProfileAvatar name={artist.display_name} image={artist.image_url} large />
               <div>
                 <h3>{artist.display_name}</h3>
                 <p>{artist.bio}</p>
@@ -311,7 +320,16 @@ export function Events() {
         eventId={event?.id}
         artistId={event?.artist_id}
         serviceId={event?.service_id}
-        initialDate={event ? new Intl.DateTimeFormat('en-CA',{timeZone:event.timezone||'UTC',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(event.starts_at)) : undefined}
+        initialDate={
+          event
+            ? new Intl.DateTimeFormat('en-CA', {
+                timeZone: event.timezone || 'UTC',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+              }).format(new Date(event.starts_at))
+            : undefined
+        }
       />
       <CTA />
     </>

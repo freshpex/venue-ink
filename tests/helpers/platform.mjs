@@ -148,6 +148,7 @@ export async function fixture() {
       ]);
       await pool.query('DELETE FROM venue_app.assets WHERE owner_id=ANY($1::uuid[])', [ids]);
       await pool.query('DELETE FROM venue_app.availability WHERE artist_id=ANY($1::uuid[])', [ids]);
+      await pool.query('DELETE FROM venue_app.services WHERE artist_id=ANY($1::uuid[])', [ids]);
       await pool.query('DELETE FROM venue_app.artist_profiles WHERE user_id=ANY($1::uuid[])', [
         ids,
       ]);

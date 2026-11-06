@@ -1,3 +1,5 @@
+import { ArtistDirectory } from './ArtistDirectory';
+import { ProfilePhotoEditor } from '../../components/ProfilePhoto';
 import { Pagination } from './OperationsPanel';
 import type { PageData } from './OperationsPanel';
 import { useState } from 'react';
@@ -142,6 +144,11 @@ export function UsersPanel() {
                   {user.email} · {user.role} · {user.active ? 'Active' : 'Restricted'}
                 </span>
               </summary>
+              <ProfilePhotoEditor
+                name={user.name}
+                image={user.image_url}
+                endpoint={'/accounts/' + user.id + '/photo'}
+              />
               <SaveForm
                 key={JSON.stringify(user)}
                 fields={[
@@ -234,94 +241,7 @@ export function AdminOverview() {
   );
 }
 export function AdminArtists() {
-  const query = useApi<{
-    artists: {
-      id: string;
-      display_name: string;
-      email: string;
-      studio_name: string;
-      active: boolean;
-      role: string;
-      published: boolean;
-      books_open: boolean;
-    }[];
-  }>('/admin/artists');
-  const [search, setSearch] = useState('');
-  return (
-    <section className="workspace-card">
-      <h2>Artist directory</h2>
-      <p>
-        These public names appear in booking, artist pages and appointment details. Publish only
-        reviewed profiles with a real artist name. The studio must also be published, have an active
-        service and the artist must set working hours before clients can select a time.
-      </p>
-      <input
-        aria-label="Search artists"
-        placeholder="Find an artist or studio"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
-      {query.isPending ? (
-        <Loading />
-      ) : query.isError ? (
-        <Failure message={query.error.message} />
-      ) : (
-        query.data.artists
-          .filter((a) =>
-            (a.display_name + ' ' + a.studio_name + ' ' + a.email)
-              .toLowerCase()
-              .includes(search.toLowerCase()),
-          )
-          .map((a) => (
-            <details className="entity-details" key={a.id}>
-              <summary>
-                <strong>{a.display_name}</strong>
-                <span>
-                  {a.studio_name} · {a.published ? 'Published' : 'Hidden'} ·{' '}
-                  {a.books_open ? 'Books open' : 'Books closed'}
-                </span>
-              </summary>
-              <p>
-                {a.email} · {a.active ? a.role : 'Restricted account'}
-              </p>
-              <SaveForm
-                key={JSON.stringify(a)}
-                fields={[
-                  {
-                    name: 'displayName',
-                    label: 'Public artist name',
-                    value: a.display_name,
-                    required: true,
-                  },
-                  {
-                    name: 'published',
-                    label: 'Publish artist profile',
-                    type: 'checkbox',
-                    value: a.published,
-                  },
-                  {
-                    name: 'booksOpen',
-                    label: 'Accept booking requests',
-                    type: 'checkbox',
-                    value: a.books_open,
-                  },
-                ]}
-                onSave={(data) =>
-                  request('/admin/artists/' + a.id, {
-                    method: 'PATCH',
-                    body: JSON.stringify({
-                      displayName: str(data, 'displayName'),
-                      published: checked(data, 'published'),
-                      booksOpen: checked(data, 'booksOpen'),
-                    }),
-                  })
-                }
-              />
-            </details>
-          ))
-      )}
-    </section>
-  );
+  return <ArtistDirectory />;
 }
 
 export function SupportPanel({ admin = false }: { admin?: boolean }) {

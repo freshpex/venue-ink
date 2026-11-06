@@ -25,6 +25,7 @@ it.skipIf(process.env.VENUE_ISOLATED_TESTS !== 'true')(
           WORKER_ENABLED: 'false',
           SITE_URL: 'http://site.venue.test',
           API_PUBLIC_URL: 'http://api.venue.test',
+          VERIFY_PROFILE_STORAGE: 'true',
         },
         stdio: ['ignore', 'pipe', 'pipe'],
       });

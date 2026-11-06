@@ -6,6 +6,7 @@ import { Loading, Failure, Empty } from '../../components/AsyncState';
 import { SaveForm, str, num, cents, checked } from './Forms';
 import type { Field } from './Forms';
 import { useApi, useSession, useRefresh, money, dateTime } from '../../lib/queries';
+import { ProfilePhotoEditor } from '../../components/ProfilePhoto';
 import { AssetImage } from '../../components/AssetImage';
 import { request } from '../../lib/api';
 import { uploadImage } from '../../lib/upload';
@@ -28,9 +29,16 @@ export function StudioSettings() {
       {query.data.studios.map((studio) => (
         <section className="workspace-card" key={studio.id}>
           <h2>{studio.name}</h2>
-          <Link className="arrow-link" to={'/studio/' + studio.slug}>
-            Studio page ↗
-          </Link>
+          <ProfilePhotoEditor
+            name={studio.name}
+            image={studio.image_url}
+            endpoint={'/studios/' + studio.id + '/photo'}
+          />
+          {studio.published && (
+            <Link className="arrow-link" to={'/studio/' + studio.slug}>
+              Studio page ↗
+            </Link>
+          )}
           <SaveForm
             fields={[
               { name: 'name', label: 'Studio name', value: studio.name, required: true },
@@ -68,11 +76,26 @@ export function StudioSettings() {
     </div>
   );
 }
-export function ServicesPanel() {
-  const query = useApi<{ services: Service[] }>('/workspace/services');
+export function ServicesPanel({ artistId }: { artistId?: string } = {}) {
+  const query = useApi<{ services: Service[] }>(
+    '/workspace/services' + (artistId ? '?artistId=' + artistId : ''),
+  );
+  const session = useSession();
+  const [studioChoice, setStudioChoice] = useState('');
   const profile = useApi<ProfileData>('/profile');
   const [selected, setSelected] = useState<Service | null>(null);
-  const studioOptions = profile.data?.studios.map((s) => ({ value: s.id, label: s.name })) || [];
+  const targetArtist = profile.data?.serviceArtists?.find((a) => a.id === artistId);
+  const studioOptions = (profile.data?.serviceStudios || profile.data?.studios || [])
+    .filter((s) => !artistId || s.id === targetArtist?.studio_id)
+    .map((s) => ({ value: s.id, label: s.name }));
+  const studioId =
+    selected?.studio_id || targetArtist?.studio_id || studioChoice || studioOptions[0]?.value;
+  const artistOptions = (profile.data?.serviceArtists || [])
+    .filter((a) => a.studio_id === studioId)
+    .map((a) => ({ value: a.id, label: a.display_name }));
+  const managesStudio = profile.data?.studios.some((s) => s.id === studioId);
+  if (profile.isPending) return <Loading />;
+  if (profile.isError) return <Failure message={profile.error.message} />;
   if (query.isPending) return <Loading />;
   if (query.isError) return <Failure message={query.error.message} />;
   const fields: Field[] = [
@@ -80,9 +103,32 @@ export function ServicesPanel() {
       name: 'studio',
       label: 'Studio',
       type: 'select',
-      value: selected?.studio_id || studioOptions[0]?.value,
-      options: studioOptions,
+      value: studioId,
+      options: selected
+        ? studioOptions.filter((s) => s.value === selected.studio_id)
+        : studioOptions,
+      onChange: setStudioChoice,
       required: true,
+    },
+    {
+      name: 'artist',
+      label: 'Artist offering this service',
+      type: 'select',
+      value: selected
+        ? selected.artist_id || ''
+        : artistId || (session.data?.role === 'artist' ? profile.data?.profile?.id : '') || '',
+      options: [
+        ...(selected?.artist_id && !artistOptions.some((a) => a.value === selected.artist_id)
+          ? [
+              {
+                value: selected.artist_id,
+                label: (selected.artist_name || 'Assigned artist') + ' (unavailable)',
+              },
+            ]
+          : []),
+        ...(managesStudio ? [{ value: '', label: 'Shared studio service' }] : []),
+        ...artistOptions,
+      ],
     },
     { name: 'name', label: 'Service name', value: selected?.name, required: true },
     {
@@ -133,8 +179,8 @@ export function ServicesPanel() {
             <span>
               <strong>{item.name}</strong>
               <small>
-                {item.studio_name} · {item.duration_minutes} minutes ·{' '}
-                {item.active ? 'Active' : 'Hidden'}
+                {item.artist_name || 'Shared studio service'} · {item.studio_name} ·{' '}
+                {item.duration_minutes} minutes · {item.active ? 'Active' : 'Hidden'}
               </small>
             </span>
             <span>{money(item.price_cents)} ↗</span>
@@ -155,6 +201,7 @@ export function ServicesPanel() {
                 method: selected ? 'PUT' : 'POST',
                 body: JSON.stringify({
                   studioId: str(data, 'studio'),
+                  artistId: str(data, 'artist') || null,
                   name: str(data, 'name'),
                   description: str(data, 'description'),
                   category: str(data, 'category'),
@@ -168,7 +215,9 @@ export function ServicesPanel() {
             }}
           />
         ) : (
-          <p>Your studio owner manages the shared service menu.</p>
+          <p>
+            Ask an administrator to assign your artist profile to a studio before adding services.
+          </p>
         )}
       </section>
     </div>

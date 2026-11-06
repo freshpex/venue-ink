@@ -6,6 +6,7 @@ import { createPool, migrateDatabase } from './db.mjs';
 import { seedDatabase } from './seed.mjs';
 import { startOperations, mailjetTransport } from './mail.mjs';
 import { createApp } from './app.mjs';
+import { verifyProfileStorage } from './profile-storage.mjs';
 if (!process.env.DATABASE_URL || !process.env.JWT_SECRET) {
   console.error('DATABASE_URL and JWT_SECRET are required.');
   process.exit(1);
@@ -128,6 +129,20 @@ for (let attempt = 1; attempt <= 5; attempt++) {
   try {
     await migrateDatabase(migrationPool);
     await seedDatabase(migrationPool);
+    if (process.env.VERIFY_PROFILE_STORAGE === 'true') {
+      await migrationPool.query('SELECT artist_id FROM venue_app.services LIMIT 0');
+      await migrationPool.query('SELECT bucket,data FROM venue_app.assets LIMIT 0');
+      await migrationPool.query('SELECT image_url FROM venue_app.users LIMIT 0');
+      await migrationPool.query('SELECT image_url FROM venue_app.studios LIMIT 0');
+      const appliedMigrations = Number(
+        (await migrationPool.query('SELECT count(*) AS count FROM venue_app.schema_migrations'))
+          .rows[0].count,
+      );
+      const status = await verifyProfileStorage(app.locals.profileStorage, migrationPool);
+      console.log(
+        JSON.stringify({ event: 'deployment.profile_storage', appliedMigrations, ...status }),
+      );
+    }
     if (!shuttingDown) ready = true;
     break;
   } catch (error) {

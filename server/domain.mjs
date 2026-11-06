@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { HttpError } from './validation.mjs';
-export const userFields = 'id,email,name,role,created_at';
+export const userFields = 'id,email,name,role,created_at,image_url';
 export const isStaff = (user) => ['admin', 'studio', 'artist'].includes(user.role);
 export const bookingFields = `b.id,b.reference,b.client_id,b.artist_id,b.service_id,b.flash_id,b.event_id,b.title,b.notes,b.placement,b.size_note,b.starts_at,b.ends_at,b.status,b.quote_cents,b.deposit_cents,b.currency,b.cancellation_note,b.created_at,b.updated_at,s.name AS service_name,s.duration_minutes,a.display_name AS artist_name,a.slug AS artist_slug,st.id AS studio_id,st.name AS studio_name,st.timezone,u.name AS client_name,u.email AS client_email,(SELECT COALESCE(sum(p.amount_cents),0)::integer FROM venue_app.payment_requests p WHERE p.booking_id=b.id AND p.status='received') - (SELECT COALESCE(sum(r.amount_cents),0)::integer FROM venue_app.refunds r JOIN venue_app.payment_requests rp ON rp.id=r.payment_id WHERE rp.booking_id=b.id AND r.status='succeeded') AS paid_cents`;
 export const bookingJoins =
@@ -86,12 +86,16 @@ export async function getSlots(db, { artistId, serviceId, date, eventId }) {
     return { slots: [], timezone: profile?.timezone || 'UTC' };
   const service = (
     await db.query(
-      'SELECT id,duration_minutes,studio_id FROM venue_app.services WHERE id=$1 AND active=true',
+      'SELECT id,duration_minutes,studio_id,artist_id FROM venue_app.services WHERE id=$1 AND active=true',
       [serviceId],
     )
   ).rows[0];
-  if (!service || service.studio_id !== profile.studio_id)
-    throw new HttpError(400, 'This service is not offered by the selected studio.');
+  if (
+    !service ||
+    service.studio_id !== profile.studio_id ||
+    (service.artist_id && service.artist_id !== artistId)
+  )
+    throw new HttpError(400, 'This service is not offered by the selected artist.');
   const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
   const hours = (
     await db.query(

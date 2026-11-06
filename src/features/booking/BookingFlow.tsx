@@ -1,3 +1,4 @@
+import { ProfileAvatar } from '../../components/ProfilePhoto';
 import { useEffect, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useForm } from 'react-hook-form';
@@ -92,7 +93,9 @@ export function BookingWizard({
       : artists.find((a) => a.studio_id === preferredStudio) || artists[0];
   const services = (servicesQuery.data?.services || []).filter(
     (s) =>
-      s.studio_id === selectedArtist?.studio_id && (!eventId || !serviceId || s.id === serviceId),
+      s.studio_id === selectedArtist?.studio_id &&
+      (!s.artist_id || s.artist_id === selectedArtist?.id) &&
+      (!eventId || !serviceId || s.id === serviceId),
   );
   const selectedService =
     services.find((s) => s.id === (serviceChoice || serviceId)) || services[0];
@@ -401,7 +404,11 @@ export function BookingWizard({
                                     setTime('');
                                   }}
                                 >
-                                  <span className="avatar large">{artist.display_name[0]}</span>
+                                  <ProfileAvatar
+                                    name={artist.display_name}
+                                    image={artist.image_url || artist.studio_image_url}
+                                    large
+                                  />
                                   <strong>{artist.display_name}</strong>
                                   <small>{artist.studio_name}</small>
                                   {selectedArtist?.id === artist.id && <Check size={17} />}
