@@ -20,6 +20,19 @@ it('connects to the configured database and verifies the seeded admin password',
   expect(admin.role).toBe('admin');
   expect(await bcrypt.compare(process.env.SEED_ADMIN_PASSWORD, admin.password_hash)).toBe(true);
 });
+it('does not spend the write limit while reading workspace data', async () => {
+  for (let request = 0; request < 100; request++)
+    expect((await f.client.agent.get('/api/notifications')).status).toBe(200);
+  const response = await f.mutation(f.client.agent.post('/api/contact')).send({
+    name: 'Read-only visitor',
+    email: f.client.email,
+    category: 'Account support',
+    studioName: '',
+    message: 'Please help with my account after browsing my workspace.',
+  });
+  expect(response.status).toBe(201);
+  f.supportRefs.push(response.body.request.reference);
+});
 it('rejects unauthorized records, origins and role escalation', async () => {
   expect((await supertest(f.app).get('/api/bookings')).status).toBe(401);
   expect((await supertest(f.app).post('/api/auth/register').send({})).status).toBe(403);

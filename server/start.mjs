@@ -6,6 +6,8 @@ import { createPool, migrateDatabase } from './db.mjs';
 import { seedDatabase } from './seed.mjs';
 import { startOperations, mailjetTransport } from './mail.mjs';
 import { createApp } from './app.mjs';
+import { verifyProfileStorage } from './profile-storage.mjs';
+import { startAssetCleanup } from './asset-storage.mjs';
 if (!process.env.DATABASE_URL || !process.env.JWT_SECRET) {
   console.error('DATABASE_URL and JWT_SECRET are required.');
   process.exit(1);
@@ -30,20 +32,23 @@ if (
   process.exit(1);
 }
 const siteUrl = process.env.SITE_URL || origins[0];
+const apiUrl = process.env.API_PUBLIC_URL || siteUrl;
 try {
-  const url = new URL(siteUrl);
-  if (
-    production &&
-    (url.protocol !== 'https:' ||
-      url.username ||
-      url.password ||
-      url.search ||
-      url.hash ||
-      url.pathname !== '/')
-  )
-    throw new Error();
+  for (const value of [siteUrl, apiUrl]) {
+    const url = new URL(value);
+    if (
+      production &&
+      (url.protocol !== 'https:' ||
+        url.username ||
+        url.password ||
+        url.search ||
+        url.hash ||
+        url.pathname !== '/')
+    )
+      throw new Error();
+  }
 } catch {
-  console.error('SITE_URL must be a valid site origin, using HTTPS in production.');
+  console.error('SITE_URL and API_PUBLIC_URL must be valid origins, using HTTPS in production.');
   process.exit(1);
 }
 let ready = false;
@@ -52,13 +57,26 @@ const app = createApp({
   pool,
   secret: process.env.JWT_SECRET,
   origins,
+  apiUrl,
   production,
   securityHeaders: production || process.env.SECURITY_HEADERS === 'true',
   isReady: () => ready,
 });
 let stopWorker = async () => {};
+let stopAssetCleanup = async () => {};
 const publicDirectory = fileURLToPath(new URL('../public', import.meta.url));
 const dist = fileURLToPath(new URL('../dist', import.meta.url));
+app.get('/venue-config.js', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  // A server-hosted build always uses its own API, including when build variables are stale.
+  res.type('application/javascript').send('window.__VENUE_CONFIG__={"apiBase":"","appOrigin":""};');
+});
+if (new URL(siteUrl).origin !== new URL(apiUrl).origin) {
+  app.get(/^(?!\/api(?:\/|$)).*/, (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.redirect(302, new URL(siteUrl).origin + req.originalUrl);
+  });
+}
 if ((production || process.env.SERVE_DIST === 'true') && existsSync(`${dist}/index.html`)) {
   app.get(/^(?!\/api(?:\/|$)).*/, (req, res, next) => {
     if (
@@ -92,6 +110,7 @@ for (const signal of ['SIGTERM', 'SIGINT'])
     shuttingDown = true;
     ready = false;
     server.close(async () => {
+      await stopAssetCleanup();
       await stopWorker();
       await pool.end();
       process.exit(0);
@@ -113,6 +132,20 @@ for (let attempt = 1; attempt <= 5; attempt++) {
   try {
     await migrateDatabase(migrationPool);
     await seedDatabase(migrationPool);
+    if (process.env.VERIFY_PROFILE_STORAGE === 'true') {
+      await migrationPool.query('SELECT artist_id FROM venue_app.services LIMIT 0');
+      await migrationPool.query('SELECT bucket,data FROM venue_app.assets LIMIT 0');
+      await migrationPool.query('SELECT image_url FROM venue_app.users LIMIT 0');
+      await migrationPool.query('SELECT image_url FROM venue_app.studios LIMIT 0');
+      const appliedMigrations = Number(
+        (await migrationPool.query('SELECT count(*) AS count FROM venue_app.schema_migrations'))
+          .rows[0].count,
+      );
+      const status = await verifyProfileStorage(app.locals.profileStorage, migrationPool);
+      console.log(
+        JSON.stringify({ event: 'deployment.profile_storage', appliedMigrations, ...status }),
+      );
+    }
     if (!shuttingDown) ready = true;
     break;
   } catch (error) {
@@ -126,6 +159,7 @@ if (!ready) {
   console.error('The database could not be initialized.');
   process.exit(1);
 }
+stopAssetCleanup = startAssetCleanup(pool, app.locals.profileStorage);
 stopWorker =
   process.env.NODE_ENV === 'test' || process.env.WORKER_ENABLED === 'false'
     ? async () => {}

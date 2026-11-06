@@ -85,6 +85,7 @@ export function enterpriseRoutes(app, { pool }) {
       args.push(value);
       where += ' AND ' + sql.replaceAll('?', '$' + args.length);
     };
+    if (req.query.clientId) add('b.client_id=?', parse(id, req.query.clientId));
     if (req.query.status)
       add(
         'b.status=?',

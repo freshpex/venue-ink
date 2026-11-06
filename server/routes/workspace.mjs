@@ -2,7 +2,9 @@ import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { z } from 'zod';
 import { parse, id, email, timezone, HttpError, serviceInput } from '../validation.mjs';
 import { transaction } from '../db.mjs';
+import { persistAsset, drainAssetDeletions } from '../asset-storage.mjs';
 import { bookingScope, bookingJoins, isStaff, canManageStudio, audit } from '../domain.mjs';
+import { assignService, managesService } from '../artist-services.mjs';
 export function workspaceRoutes(app, { pool }) {
   const staff = (req, _res, next) =>
     isStaff(req.user)
@@ -30,13 +32,13 @@ export function workspaceRoutes(app, { pool }) {
     const profile =
       (
         await pool.query(
-          'SELECT user_id AS id,studio_id,slug,display_name,bio,styles,theme,image_url,published,books_open FROM venue_app.artist_profiles WHERE user_id=$1',
+          'SELECT user_id AS id,studio_id,slug,display_name,bio,styles,theme,image_url,published,books_open FROM venue_app.artist_profiles WHERE user_id=$1 AND deleted_at IS NULL',
           [req.user.id],
         )
       ).rows[0] || null;
     const studios = (
       await pool.query(
-        "SELECT id,name,slug,bio,location,timezone,published FROM venue_app.studios WHERE owner_id=$1 OR $2=true OR EXISTS(SELECT 1 FROM venue_app.studio_access sa WHERE sa.studio_id=venue_app.studios.id AND sa.user_id=$1 AND sa.access_role='manager') ORDER BY created_at",
+        "SELECT id,name,slug,bio,location,timezone,published,image_url FROM venue_app.studios WHERE owner_id=$1 OR $2=true OR EXISTS(SELECT 1 FROM venue_app.studio_access sa WHERE sa.studio_id=venue_app.studios.id AND sa.user_id=$1 AND sa.access_role='manager') ORDER BY created_at",
         [req.user.id, req.user.role === 'admin'],
       )
     ).rows;
@@ -48,7 +50,25 @@ export function workspaceRoutes(app, { pool }) {
           )
         ).rows
       : [];
-    res.json({ profile, studios, availability });
+    const serviceStudios = [...studios];
+    if (profile?.studio_id && !serviceStudios.some((s) => s.id === profile.studio_id)) {
+      const studio = (
+        await pool.query(
+          'SELECT id,name,slug,bio,location,timezone,published,image_url FROM venue_app.studios WHERE id=$1',
+          [profile.studio_id],
+        )
+      ).rows[0];
+      if (studio) serviceStudios.push(studio);
+    }
+    const serviceArtists = isStaff(req.user)
+      ? (
+          await pool.query(
+            "SELECT a.user_id AS id,a.studio_id,a.display_name FROM venue_app.artist_profiles a JOIN venue_app.users u ON u.id=a.user_id WHERE a.studio_id=ANY($1::uuid[]) AND a.deleted_at IS NULL AND u.active=true AND u.role IN ('artist','admin') AND (a.user_id=$2 OR a.studio_id=ANY($3::uuid[])) ORDER BY a.display_name",
+            [serviceStudios.map((s) => s.id), req.user.id, studios.map((s) => s.id)],
+          )
+        ).rows
+      : [];
+    res.json({ profile, studios, serviceStudios, serviceArtists, availability });
   });
   app.patch('/api/account', async (req, res) => {
     const { name } = parse(
@@ -81,10 +101,10 @@ export function workspaceRoutes(app, { pool }) {
       if (values.imageAssetId !== undefined) {
         if (values.imageAssetId) {
           const asset = (
-            await db.query('SELECT id FROM venue_app.assets WHERE id=$1 AND owner_id=$2', [
-              values.imageAssetId,
-              req.user.id,
-            ])
+            await db.query(
+              'SELECT id FROM venue_app.assets WHERE id=$1 AND owner_id=$2 FOR KEY SHARE',
+              [values.imageAssetId, req.user.id],
+            )
           ).rows[0];
           if (!asset) throw new HttpError(400, 'Upload a profile image to your own account.');
           await db.query('UPDATE venue_app.assets SET public=true WHERE id=$1', [asset.id]);
@@ -182,22 +202,25 @@ export function workspaceRoutes(app, { pool }) {
     res.json({
       services: (
         await pool.query(
-          "SELECT s.id,s.studio_id,s.name,s.description,s.category,s.duration_minutes,s.price_cents,s.deposit_cents,s.currency,s.active,st.name AS studio_name FROM venue_app.services s JOIN venue_app.studios st ON st.id=s.studio_id WHERE st.owner_id=$1 OR $2=true OR EXISTS(SELECT 1 FROM venue_app.studio_access sa WHERE sa.studio_id=st.id AND sa.user_id=$1 AND sa.access_role='manager') ORDER BY s.created_at",
-          [req.user.id, req.user.role === 'admin'],
+          "SELECT s.id,s.studio_id,s.artist_id,s.name,s.description,s.category,s.duration_minutes,s.price_cents,s.deposit_cents,s.currency,s.active,st.name AS studio_name,a.display_name AS artist_name FROM venue_app.services s JOIN venue_app.studios st ON st.id=s.studio_id LEFT JOIN venue_app.artist_profiles a ON a.user_id=s.artist_id WHERE (st.owner_id=$1 OR $2=true OR (s.artist_id=$1 AND a.studio_id=s.studio_id AND a.deleted_at IS NULL) OR EXISTS(SELECT 1 FROM venue_app.studio_access sa WHERE sa.studio_id=st.id AND sa.user_id=$1 AND sa.access_role='manager')) AND ($3::uuid IS NULL OR s.artist_id=$3 OR (s.artist_id IS NULL AND s.studio_id=(SELECT studio_id FROM venue_app.artist_profiles WHERE user_id=$3))) ORDER BY s.created_at",
+          [
+            req.user.id,
+            req.user.role === 'admin',
+            req.query.artistId ? parse(id, req.query.artistId) : null,
+          ],
         )
       ).rows,
     }),
   );
   app.post('/api/workspace/services', staff, async (req, res) => {
     const v = parse(serviceInput, req.body);
-    if (!(await canManageStudio(pool, v.studioId, req.user)))
-      throw new HttpError(403, 'You cannot manage this studio.');
     if (v.priceCents !== null && v.depositCents > v.priceCents)
       throw new HttpError(400, 'A deposit cannot be greater than the service price.');
     const service = await transaction(pool, async (db) => {
+      const artistId = await assignService(db, v, req.user);
       const service = (
         await db.query(
-          'INSERT INTO venue_app.services(id,studio_id,name,description,category,duration_minutes,price_cents,deposit_cents,active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id',
+          'INSERT INTO venue_app.services(id,studio_id,name,description,category,duration_minutes,price_cents,deposit_cents,active,artist_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id',
           [
             randomUUID(),
             v.studioId,
@@ -208,6 +231,7 @@ export function workspaceRoutes(app, { pool }) {
             v.priceCents,
             v.depositCents,
             v.active,
+            artistId,
           ],
         )
       ).rows[0];
@@ -223,18 +247,24 @@ export function workspaceRoutes(app, { pool }) {
       throw new HttpError(400, 'A deposit cannot be greater than the service price.');
     await transaction(pool, async (db) => {
       const existing = (
-        await db.query('SELECT studio_id FROM venue_app.services WHERE id=$1 FOR UPDATE', [
-          serviceId,
-        ])
+        await db.query(
+          'SELECT studio_id,artist_id FROM venue_app.services WHERE id=$1 FOR UPDATE',
+          [serviceId],
+        )
       ).rows[0];
       if (
         !existing ||
         existing.studio_id !== v.studioId ||
-        !(await canManageStudio(db, existing.studio_id, req.user))
+        !(await managesService(db, existing, req.user))
       )
         throw new HttpError(404, 'Service not found.');
+      const artistId = await assignService(
+        db,
+        { ...v, artistId: v.artistId === undefined ? existing.artist_id : v.artistId },
+        req.user,
+      );
       await db.query(
-        'UPDATE venue_app.services SET name=$1,description=$2,category=$3,duration_minutes=$4,price_cents=$5,deposit_cents=$6,active=$7 WHERE id=$8',
+        'UPDATE venue_app.services SET name=$1,description=$2,category=$3,duration_minutes=$4,price_cents=$5,deposit_cents=$6,active=$7,artist_id=$9 WHERE id=$8',
         [
           v.name,
           v.description,
@@ -244,6 +274,7 @@ export function workspaceRoutes(app, { pool }) {
           v.depositCents,
           v.active,
           serviceId,
+          artistId,
         ],
       );
       await audit(db, req.user, 'service.updated', serviceId, { name: v.name });
@@ -321,35 +352,17 @@ export function workspaceRoutes(app, { pool }) {
       (v.mimeType === 'image/webp' && webp)
     ))
       throw new HttpError(400, 'Choose a valid JPEG, PNG or WebP image.');
-    const asset = await transaction(pool, async (db) => {
-      await db.query('SELECT id FROM venue_app.users WHERE id=$1 FOR UPDATE', [req.user.id]);
-      const usage = Number(
-        (
-          await db.query(
-            'SELECT COALESCE(sum(byte_size),0) AS bytes FROM venue_app.assets WHERE owner_id=$1',
-            [req.user.id],
-          )
-        ).rows[0].bytes,
-      );
-      if (usage + bytes.length > 40 * 1024 * 1024)
-        throw new HttpError(
-          409,
-          'Your image storage is full. Remove unused images before uploading more.',
-        );
-      const saved = (
-        await db.query(
-          'INSERT INTO venue_app.assets(id,owner_id,mime_type,filename,byte_size,data) VALUES($1,$2,$3,$4,$5,$6) RETURNING id,filename,byte_size',
-          [
-            randomUUID(),
-            req.user.id,
-            v.mimeType,
-            v.filename.replace(/[^a-zA-Z0-9._ -]/g, '').slice(0, 150) || 'reference',
-            bytes.length,
-            bytes,
-          ],
-        )
-      ).rows[0];
-      return saved;
+    const asset = {
+      id: randomUUID(),
+      filename: v.filename.replace(/[^a-zA-Z0-9._ -]/g, '').slice(0, 150) || 'reference',
+      byte_size: bytes.length,
+    };
+    await persistAsset(pool, app.locals.profileStorage, {
+      id: asset.id,
+      ownerId: req.user.id,
+      bytes,
+      mimeType: v.mimeType,
+      filename: asset.filename,
     });
     res.status(201).json({ asset: { ...asset, url: `/api/assets/${asset.id}` } });
   });
@@ -365,17 +378,23 @@ export function workspaceRoutes(app, { pool }) {
   );
   app.delete('/api/assets/:id', async (req, res) => {
     const assetId = parse(id, req.params.id);
-    const used = await pool.query(
-      'SELECT 1 FROM venue_app.booking_assets WHERE asset_id=$1 UNION ALL SELECT 1 FROM venue_app.flash_designs WHERE asset_id=$1 UNION ALL SELECT 1 FROM venue_app.artist_profiles WHERE image_url=$2',
-      [assetId, `/api/assets/${assetId}`],
-    );
-    if (used.rowCount)
-      throw new HttpError(409, 'This image is in use by a booking or published work.');
-    const removed = await pool.query(
-      'DELETE FROM venue_app.assets WHERE id=$1 AND owner_id=$2 RETURNING id',
-      [assetId, req.user.id],
-    );
-    if (!removed.rowCount) throw new HttpError(404, 'Image not found.');
+    await transaction(pool, async (db) => {
+      const asset = (
+        await db.query('SELECT id FROM venue_app.assets WHERE id=$1 AND owner_id=$2 FOR UPDATE', [
+          assetId,
+          req.user.id,
+        ])
+      ).rows[0];
+      if (!asset) throw new HttpError(404, 'Image not found.');
+      const used = await db.query(
+        'SELECT 1 FROM venue_app.booking_assets WHERE asset_id=$1 UNION ALL SELECT 1 FROM venue_app.flash_designs WHERE asset_id=$1 UNION ALL SELECT 1 FROM venue_app.artist_profiles WHERE image_url=$2 UNION ALL SELECT 1 FROM venue_app.users WHERE image_url=$2 UNION ALL SELECT 1 FROM venue_app.studios WHERE image_url=$2',
+        [assetId, `/api/assets/${assetId}`],
+      );
+      if (used.rowCount)
+        throw new HttpError(409, 'This image is in use by a booking or published work.');
+      await db.query('DELETE FROM venue_app.assets WHERE id=$1', [assetId]);
+    });
+    await drainAssetDeletions(pool, app.locals.profileStorage).catch(() => {});
     res.json({ ok: true });
   });
   app.get('/api/workspace/flash', staff, async (req, res) =>

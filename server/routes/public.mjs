@@ -1,3 +1,4 @@
+import { readAsset } from '../asset-storage.mjs';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { parse, id, email, HttpError } from '../validation.mjs';
@@ -16,7 +17,7 @@ export function publicRoutes(app, { pool, writeLimiter }) {
   app.get('/api/artists', async (_req, res) => {
     const artists = (
       await pool.query(
-        'SELECT a.user_id AS id,a.slug,a.display_name,a.bio,a.styles,a.theme,a.image_url,a.books_open,a.studio_id,st.name AS studio_name,st.timezone FROM venue_app.artist_profiles a JOIN venue_app.users u ON u.id=a.user_id AND u.active=true LEFT JOIN venue_app.studios st ON st.id=a.studio_id WHERE a.published=true AND st.published=true ORDER BY a.created_at LIMIT 100',
+        'SELECT a.user_id AS id,a.slug,a.display_name,a.bio,a.styles,a.theme,a.image_url,a.books_open,a.studio_id,st.image_url AS studio_image_url,st.name AS studio_name,st.timezone FROM venue_app.artist_profiles a JOIN venue_app.users u ON u.id=a.user_id AND u.active=true LEFT JOIN venue_app.studios st ON st.id=a.studio_id WHERE a.published=true AND st.published=true ORDER BY a.created_at LIMIT 100',
       )
     ).rows;
     res.json({ artists });
@@ -24,15 +25,15 @@ export function publicRoutes(app, { pool, writeLimiter }) {
   app.get('/api/artists/:slug', async (req, res) => {
     const artist = (
       await pool.query(
-        'SELECT a.user_id AS id,a.slug,a.display_name,a.bio,a.styles,a.theme,a.image_url,a.books_open,a.studio_id,st.name AS studio_name,st.timezone FROM venue_app.artist_profiles a JOIN venue_app.users u ON u.id=a.user_id AND u.active=true LEFT JOIN venue_app.studios st ON st.id=a.studio_id WHERE a.slug=$1 AND a.published=true AND st.published=true',
+        'SELECT a.user_id AS id,a.slug,a.display_name,a.bio,a.styles,a.theme,a.image_url,a.books_open,a.studio_id,st.image_url AS studio_image_url,st.name AS studio_name,st.timezone FROM venue_app.artist_profiles a JOIN venue_app.users u ON u.id=a.user_id AND u.active=true LEFT JOIN venue_app.studios st ON st.id=a.studio_id WHERE a.slug=$1 AND a.published=true AND st.published=true',
         [req.params.slug],
       )
     ).rows[0];
     if (!artist) throw new HttpError(404, 'Artist not found.');
     const services = (
       await pool.query(
-        'SELECT id,name,description,category,duration_minutes,price_cents,deposit_cents,currency FROM venue_app.services WHERE active=true AND studio_id=$1 ORDER BY created_at',
-        [artist.studio_id],
+        'SELECT id,artist_id,name,description,category,duration_minutes,price_cents,deposit_cents,currency FROM venue_app.services WHERE active=true AND studio_id=$1 AND (artist_id IS NULL OR artist_id=$2) ORDER BY created_at',
+        [artist.studio_id, artist.id],
       )
     ).rows;
     res.json({ artist, services });
@@ -41,7 +42,7 @@ export function publicRoutes(app, { pool, writeLimiter }) {
     res.json({
       studios: (
         await pool.query(
-          'SELECT id,name,slug,bio,location,timezone FROM venue_app.studios WHERE published=true ORDER BY created_at LIMIT 100',
+          'SELECT id,name,slug,bio,location,timezone,image_url FROM venue_app.studios WHERE published=true ORDER BY created_at LIMIT 100',
         )
       ).rows,
     }),
@@ -49,7 +50,7 @@ export function publicRoutes(app, { pool, writeLimiter }) {
   app.get('/api/studios/:slug', async (req, res) => {
     const studio = (
       await pool.query(
-        'SELECT id,name,slug,bio,location,timezone FROM venue_app.studios WHERE slug=$1 AND published=true',
+        'SELECT id,name,slug,bio,location,timezone,image_url FROM venue_app.studios WHERE slug=$1 AND published=true',
         [req.params.slug],
       )
     ).rows[0];
@@ -69,10 +70,14 @@ export function publicRoutes(app, { pool, writeLimiter }) {
       params.push(parse(id, req.query.studioId));
       condition += ' AND s.studio_id=$1';
     }
+    if (req.query.artistId) {
+      params.push(parse(id, req.query.artistId));
+      condition += ` AND (s.artist_id IS NULL OR s.artist_id=$${params.length}) AND s.studio_id=(SELECT studio_id FROM venue_app.artist_profiles WHERE user_id=$${params.length} AND deleted_at IS NULL)`;
+    }
     res.json({
       services: (
         await pool.query(
-          `SELECT s.id,s.studio_id,s.name,s.description,s.category,s.duration_minutes,s.price_cents,s.deposit_cents,s.currency,st.name AS studio_name FROM venue_app.services s JOIN venue_app.studios st ON st.id=s.studio_id WHERE ${condition} ORDER BY s.created_at`,
+          `SELECT s.id,s.studio_id,s.artist_id,s.name,s.description,s.category,s.duration_minutes,s.price_cents,s.deposit_cents,s.currency,st.name AS studio_name FROM venue_app.services s JOIN venue_app.studios st ON st.id=s.studio_id WHERE ${condition} ORDER BY s.created_at`,
           params,
         )
       ).rows,
@@ -132,9 +137,10 @@ export function publicRoutes(app, { pool, writeLimiter }) {
   app.get('/api/assets/:id', async (req, res) => {
     const assetId = parse(id, req.params.id);
     const asset = (
-      await pool.query('SELECT id,owner_id,mime_type,public FROM venue_app.assets WHERE id=$1', [
-        assetId,
-      ])
+      await pool.query(
+        'SELECT id,owner_id,mime_type,public,bucket,storage_provider,storage_key,byte_size FROM venue_app.assets WHERE id=$1',
+        [assetId],
+      )
     ).rows[0];
     if (!asset) throw new HttpError(404, 'Image not found.');
     let permitted = asset.public;
@@ -151,8 +157,7 @@ export function publicRoutes(app, { pool, writeLimiter }) {
       }
     }
     if (!permitted) throw new HttpError(404, 'Image not found.');
-    const bytes = (await pool.query('SELECT data FROM venue_app.assets WHERE id=$1', [assetId]))
-      .rows[0].data;
+    const bytes = await readAsset(pool, app.locals.profileStorage, asset);
     res.set('Content-Type', asset.mime_type);
     res.set('Cross-Origin-Resource-Policy', 'cross-origin');
     res.set('Cache-Control', asset.public ? 'public,max-age=3600' : 'private,no-store');

@@ -24,6 +24,7 @@ export type Field = {
   step?: string;
   options?: { value: string; label: string }[];
   hint?: string;
+  onChange?: (value: string) => void;
 };
 function Input({ field }: { field: Field }) {
   const [visible, setVisible] = useState(false);
@@ -48,7 +49,11 @@ function Input({ field }: { field: Field }) {
           {field.type === 'textarea' ? (
             <textarea {...common} rows={5} defaultValue={String(field.value ?? '')} />
           ) : field.type === 'select' ? (
-            <select {...common} defaultValue={String(field.value ?? '')}>
+            <select
+              {...common}
+              defaultValue={String(field.value ?? '')}
+              onChange={(event) => field.onChange?.(event.target.value)}
+            >
               {field.options?.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}

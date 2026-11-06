@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { fixture } from '../helpers/platform.mjs';
+import { forwardWithoutCookies } from '../helpers/cookieless-route';
 
 let f: Awaited<ReturnType<typeof fixture>>;
 test.beforeAll(async () => {
@@ -8,27 +9,35 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   await f?.cleanup();
 });
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'wait' });
+});
 test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem(
+        'venue-cookie-consent',
+        JSON.stringify({ version: 2, chat: true, savedAt: Date.now() }),
+      );
+    } catch {
+      /* Some payment frames have opaque origins. */
+    }
+  });
   await page.route('https://embed.tawk.to/**', (route) => route.abort());
 });
 
 test('keeps the sign-in form visible when the browser cannot retain its session cookie', async ({
   page,
+  request,
 }) => {
   await page.route('**/api/auth/login', async (route) => {
-    const response = await route.fetch();
-    expect(response.status()).toBe(200);
-    const headers = response.headers();
-    delete headers['set-cookie'];
-    // route.fetch also maintains an API cookie jar; explicitly clear the browser jar.
-    await page.context().clearCookies();
-    await route.fulfill({ response, headers });
+    expect(await forwardWithoutCookies(route, request)).toBe(200);
   });
   await page.goto('/login');
   await page.getByLabel('Email address', { exact: true }).fill(f.artist.email);
   await page.getByLabel('Password', { exact: true }).fill(f.artist.password);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('sign-in could not be verified');
+  await expect(page.getByRole('alert')).toContainText('sign-in could not be completed');
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeEnabled();
 });

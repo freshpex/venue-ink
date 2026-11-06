@@ -1,6 +1,6 @@
 import { request } from './api';
 import type { Asset } from './types';
-export async function uploadImage(file: File): Promise<Asset> {
+export async function prepareImage(file: File) {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 8 * 1024 * 1024)
     throw new Error('Choose a JPEG, PNG or WebP smaller than 8 MB.');
   const bitmap = await createImageBitmap(file);
@@ -16,13 +16,12 @@ export async function uploadImage(file: File): Promise<Asset> {
   context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
   const encoded = canvas.toDataURL('image/jpeg', 0.84).split(',')[1];
+  return { filename: file.name.replace(/\.[^.]+$/, '.jpg'), mimeType: 'image/jpeg', data: encoded };
+}
+export async function uploadImage(file: File): Promise<Asset> {
   const result = await request<{ asset: Asset }>('/assets', {
     method: 'POST',
-    body: JSON.stringify({
-      filename: file.name.replace(/\.[^.]+$/, '.jpg'),
-      mimeType: 'image/jpeg',
-      data: encoded,
-    }),
+    body: JSON.stringify(await prepareImage(file)),
   });
   return result.asset;
 }

@@ -57,6 +57,7 @@ export const bookingInput = z
   .strict();
 export const serviceInput = z
   .object({
+    artistId: id.nullable().optional(),
     studioId: id,
     name: z.string().trim().min(3).max(100),
     description: z.string().trim().max(1500).default(''),

@@ -1,18 +1,20 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowUpRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { SaveForm, str, checked, options } from './Forms';
-import { useApi, useSession, useRefresh, assetUrl } from '../../lib/queries';
+import { useApi, useSession, useRefresh } from '../../lib/queries';
+import { ProfilePhotoEditor } from '../../components/ProfilePhoto';
+import { AssetImage } from '../../components/AssetImage';
 import { request } from '../../lib/api';
-import { uploadImage } from '../../lib/upload';
 import type { Artist, Studio, Asset } from '../../lib/types';
 import { Failure, Loading } from '../../components/AsyncState';
 import { Button } from '../../components/ui/button';
 export type ProfileData = {
   profile: Artist | null;
   studios: Studio[];
+  serviceStudios?: Studio[];
+  serviceArtists?: { id: string; studio_id: string; display_name: string }[];
   availability: { weekday: number; start_time: string; end_time: string }[];
 };
 export function AccountPanel() {
@@ -21,7 +23,6 @@ export function AccountPanel() {
   const assets = useApi<{ assets: Asset[] }>('/assets');
   const client = useQueryClient();
   const refresh = useRefresh();
-  const [uploading, setUploading] = useState(false);
   if (query.isPending) return <Loading />;
   if (query.isError) return <Failure message={query.error.message} />;
   const profile = query.data.profile;
@@ -29,6 +30,14 @@ export function AccountPanel() {
     <div className="workspace-columns">
       <section className="workspace-card">
         <h2>Your account.</h2>
+        {session.data && !profile && (
+          <ProfilePhotoEditor
+            name={session.data.name}
+            image={session.data.image_url}
+            endpoint={'/accounts/' + session.data.id + '/photo'}
+          />
+        )}
+
         <SaveForm
           fields={[{ name: 'name', label: 'Your name', value: session.data?.name, required: true }]}
           onSave={async (data) => {
@@ -66,10 +75,19 @@ export function AccountPanel() {
       {profile && (
         <section className="workspace-card">
           <h2>Your artist page.</h2>
-          <Link className="arrow-link" to={'/artists/' + profile.slug}>
-            {profile.published ? 'Open public page' : 'Page is not published'}
-            <ArrowUpRight size={16} />
-          </Link>
+          {profile.published &&
+          (query.data.serviceStudios || query.data.studios).some(
+            (s) => s.id === profile.studio_id && s.published,
+          ) ? (
+            <Link className="arrow-link" to={'/artists/' + profile.slug}>
+              Open public page
+              <ArrowUpRight size={16} />
+            </Link>
+          ) : (
+            <p>
+              Your artist page appears publicly once both your profile and studio are published.
+            </p>
+          )}
           <SaveForm
             key={JSON.stringify(profile)}
             fields={[
@@ -122,40 +140,11 @@ export function AccountPanel() {
               })
             }
           />
-          <label className="upload-button">
-            {uploading ? 'Uploading your image…' : 'Upload profile photograph'}
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              disabled={uploading}
-              onChange={async (event) => {
-                const file = event.target.files?.[0];
-                if (!file) return;
-                setUploading(true);
-                try {
-                  const asset = await uploadImage(file);
-                  await request('/profile', {
-                    method: 'PUT',
-                    body: JSON.stringify({
-                      displayName: profile.display_name,
-                      bio: profile.bio,
-                      styles: profile.styles,
-                      theme: profile.theme,
-                      published: profile.published,
-                      booksOpen: profile.books_open,
-                      imageAssetId: asset.id,
-                    }),
-                  });
-                  refresh();
-                  toast.success('Profile photograph saved');
-                } catch (error) {
-                  toast.error((error as Error).message);
-                } finally {
-                  setUploading(false);
-                }
-              }}
-            />
-          </label>
+          <ProfilePhotoEditor
+            name={profile.display_name}
+            image={profile.image_url}
+            endpoint={'/accounts/' + session.data!.id + '/photo'}
+          />
         </section>
       )}
       <section className="workspace-card">
@@ -167,7 +156,7 @@ export function AccountPanel() {
         <div className="asset-grid">
           {assets.data?.assets.map((asset) => (
             <div key={asset.id}>
-              <img src={assetUrl(asset.url)} alt={asset.filename} />
+              <AssetImage path={asset.url} alt={asset.filename} />
               <span>{asset.filename}</span>
               <Button
                 variant="outline"
@@ -191,8 +180,10 @@ export function AccountPanel() {
     </div>
   );
 }
-export function AvailabilityPanel() {
-  const query = useApi<ProfileData>('/profile');
+export function AvailabilityPanel({ artistId }: { artistId?: string } = {}) {
+  const query = useApi<ProfileData>(
+    artistId ? '/admin/artists/' + artistId + '/setup' : '/profile',
+  );
   if (query.isPending) return <Loading />;
   if (query.isError) return <Failure message={query.error.message} />;
   return (
@@ -231,7 +222,7 @@ export function AvailabilityPanel() {
           ];
         })}
         onSave={(data) =>
-          request('/availability', {
+          request(artistId ? '/admin/artists/' + artistId + '/availability' : '/availability', {
             method: 'PUT',
             body: JSON.stringify({
               hours: Array.from({ length: 7 }, (_, weekday) => ({

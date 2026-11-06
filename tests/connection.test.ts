@@ -1,10 +1,46 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { waitForServer } from '../src/lib/api';
+import { request, waitForServer } from '../src/lib/api';
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 describe('Render connection readiness', () => {
+  it('supports browsers without AbortSignal.any or AbortSignal.timeout', async () => {
+    vi.spyOn(AbortSignal, 'any').mockImplementation(() => {
+      throw new Error('Unsupported');
+    });
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => {
+      throw new Error('Unsupported');
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ ready: true }), {
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+    await expect(waitForServer(() => {}, new AbortController().signal)).resolves.toBeUndefined();
+  });
+  it('aborts an in-flight request when its caller cancels', async () => {
+    let signal: AbortSignal | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url, options) => {
+        signal = options.signal;
+        return new Promise((_resolve, reject) =>
+          signal?.addEventListener('abort', () => reject(signal?.reason), { once: true }),
+        );
+      }),
+    );
+    const parent = new AbortController();
+    const result = request('/auth/me', {}, parent.signal);
+    const assertion = expect(result).rejects.toThrow();
+    parent.abort();
+    await assertion;
+    expect(signal?.aborted).toBe(true);
+  });
   it('waits through a sleeping response, then continues once ready', async () => {
     vi.useFakeTimers();
     const fetch = vi

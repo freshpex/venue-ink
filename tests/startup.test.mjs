@@ -18,7 +18,15 @@ it.skipIf(process.env.VENUE_ISOLATED_TESTS !== 'true')(
     try {
       await lock.query('SELECT pg_advisory_lock($1)', [7912055]);
       child = spawn(process.execPath, ['server/start.mjs'], {
-        env: { ...process.env, PORT: String(port), NODE_ENV: 'test', WORKER_ENABLED: 'false' },
+        env: {
+          ...process.env,
+          PORT: String(port),
+          NODE_ENV: 'test',
+          WORKER_ENABLED: 'false',
+          SITE_URL: 'http://site.venue.test',
+          API_PUBLIC_URL: 'http://api.venue.test',
+          VERIFY_PROFILE_STORAGE: 'true',
+        },
         stdio: ['ignore', 'pipe', 'pipe'],
       });
       exited = new Promise((resolve) => child.once('exit', (code) => resolve(code)));
@@ -37,6 +45,16 @@ it.skipIf(process.env.VENUE_ISOLATED_TESTS !== 'true')(
         });
       });
       await listening;
+      const oldPage = await fetch(`http://127.0.0.1:${port}/bookings/example?view=details`, {
+        redirect: 'manual',
+      });
+      expect(oldPage.status).toBe(302);
+      expect(oldPage.headers.get('location')).toBe(
+        'http://site.venue.test/bookings/example?view=details',
+      );
+      const config = await fetch(`http://127.0.0.1:${port}/venue-config.js`);
+      expect(config.headers.get('cache-control')).toBe('no-store');
+      expect(await config.text()).toBe('window.__VENUE_CONFIG__={"apiBase":"","appOrigin":""};');
       const base = `http://127.0.0.1:${port}/api`;
       const live = await fetch(base + '/health/live');
       expect(live.status).toBe(200);

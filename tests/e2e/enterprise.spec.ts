@@ -9,6 +9,16 @@ test.afterAll(async () => {
   await f?.cleanup();
 });
 test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem(
+        'venue-cookie-consent',
+        JSON.stringify({ version: 2, chat: true, savedAt: Date.now() }),
+      );
+    } catch {
+      /* Some payment frames have opaque origins. */
+    }
+  });
   await page.route('https://embed.tawk.to/**', (route) => route.abort());
 });
 test('client enrolls an authenticator and signs in with a one-use recovery code', async ({
@@ -33,12 +43,16 @@ test('client enrolls an authenticator and signs in with a one-use recovery code'
   const context = await browser.newContext();
   const other = await context.newPage();
   await other.goto('http://127.0.0.1:4173/login');
+  await expect(other.getByLabel('Authenticator or recovery code', { exact: true })).toHaveCount(0);
+  await other.getByRole('button', { name: 'Accept essential cookies', exact: true }).click();
   await other.getByLabel('Email address', { exact: true }).fill(f.client.email);
   await other.getByLabel('Password', { exact: true }).fill(f.client.password);
   await other.getByRole('button', { name: 'Sign in', exact: true }).click();
-  await expect(other.getByRole('alert')).toContainText('authenticator');
+  await expect(other.getByRole('heading', { name: 'Verify your sign-in.' })).toBeVisible();
+  await expect(other.getByLabel('Password', { exact: true })).toHaveCount(0);
+  await expect(other.getByRole('alert')).toHaveCount(0);
   await other.getByLabel('Authenticator or recovery code', { exact: true }).fill(codes[0]);
-  await other.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await other.getByRole('button', { name: 'Verify and sign in', exact: true }).click();
   await expect(other).toHaveURL(/\/dashboard/);
   await context.close();
 });

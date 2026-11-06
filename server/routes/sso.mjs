@@ -43,8 +43,17 @@ export function configuredOidc({ issuer, clientId, clientSecret, redirectUri }) 
 }
 export function ssoRoutes(
   app,
-  { pool, key, siteUrl, issue, limiter, production, provider, domains = [] },
+  { pool, key, siteUrl, apiUrl = siteUrl, issue, limiter, production, provider, domains = [] },
 ) {
+  const separateSite = new URL(siteUrl).origin !== new URL(apiUrl).origin;
+  async function challengeFor(user, purpose) {
+    const token = purpose + randomBytes(32).toString('base64url');
+    await pool.query(
+      "INSERT INTO venue_app.sso_challenges(token_hash,user_id,session_version,expires_at) VALUES($1,$2,$3,now()+interval '5 minutes')",
+      [digest(token), user.id, user.session_version],
+    );
+    return token;
+  }
   app.get('/api/auth/providers', (_req, res) => res.json({ ssoEnabled: !!provider }));
   const cookie = {
     httpOnly: true,
@@ -71,7 +80,7 @@ export function ssoRoutes(
       const flow = JSON.parse(unseal(encrypted, key));
       if (flow.expiresAt < Date.now() || req.query.state !== flow.state)
         throw new Error('Invalid flow');
-      const claims = await provider.finish(new URL(req.originalUrl, siteUrl), flow);
+      const claims = await provider.finish(new URL(req.originalUrl, apiUrl), flow);
       if (!claims.sub || !claims.iss || claims.email_verified !== true || !claims.email)
         throw new Error('Verified identity required');
       const email = String(claims.email).toLowerCase();
@@ -116,13 +125,14 @@ export function ssoRoutes(
         return user;
       });
       if (user.mfa_secret) {
-        const token = randomBytes(32).toString('base64url');
-        await pool.query(
-          "INSERT INTO venue_app.sso_challenges(token_hash,user_id,session_version,expires_at) VALUES($1,$2,$3,now()+interval '5 minutes')",
-          [digest(token), user.id, user.session_version],
-        );
+        const token = await challengeFor(user, 'sso_mfa_');
+        if (separateSite) return res.redirect(siteUrl + '/login?sso=mfa#challenge=' + token);
         res.cookie('venue_sso_challenge', token, cookie);
         return res.redirect(siteUrl + '/login?sso=mfa');
+      }
+      if (separateSite) {
+        const token = await challengeFor(user, 'sso_exchange_');
+        return res.redirect(siteUrl + '/login?sso=complete#exchange=' + token);
       }
       await issue(req, res, user);
       res.redirect(siteUrl + (user.role === 'admin' ? '/admin' : '/dashboard'));
@@ -131,9 +141,21 @@ export function ssoRoutes(
     }
   });
   app.post('/api/auth/sso/complete', limiter, async (req, res) => {
-    const v = parse(z.object({ code: z.string().trim().min(1).max(40) }).strict(), req.body);
-    const token = req.cookies.venue_sso_challenge;
-    if (!token) throw new HttpError(401, 'Start organization sign-in again.');
+    const v = parse(
+      z
+        .object({
+          code: z.string().trim().min(1).max(40),
+          challenge: z.string().max(150).optional(),
+        })
+        .strict(),
+      req.body,
+    );
+    const token =
+      v.challenge && req.get('X-Venue-Session') === 'browser'
+        ? v.challenge
+        : req.cookies.venue_sso_challenge;
+    if (!token?.startsWith('sso_mfa_'))
+      throw new HttpError(401, 'Start organization sign-in again.');
     const user = await transaction(pool, async (db) => {
       const challenge = (
         await db.query(
@@ -167,5 +189,35 @@ export function ssoRoutes(
         mfaEnabled: !!user.mfa_secret,
       },
     });
+  });
+  app.post('/api/auth/sso/exchange', limiter, async (req, res) => {
+    const v = parse(
+      z.object({ exchange: z.string().max(150).startsWith('sso_exchange_') }).strict(),
+      req.body,
+    );
+    if (req.get('X-Venue-Session') !== 'browser')
+      throw new HttpError(400, 'Start organization sign-in again.');
+    const user = await transaction(pool, async (db) => {
+      const challenge = (
+        await db.query(
+          'SELECT * FROM venue_app.sso_challenges WHERE token_hash=$1 AND used_at IS NULL AND expires_at>now() FOR UPDATE',
+          [digest(v.exchange)],
+        )
+      ).rows[0];
+      if (!challenge) throw new HttpError(401, 'Start organization sign-in again.');
+      const user = (
+        await db.query('SELECT * FROM venue_app.users WHERE id=$1 AND active=true FOR UPDATE', [
+          challenge.user_id,
+        ])
+      ).rows[0];
+      if (!user || user.session_version !== challenge.session_version || user.mfa_secret)
+        throw new HttpError(401, 'Start organization sign-in again.');
+      await db.query('UPDATE venue_app.sso_challenges SET used_at=now() WHERE token_hash=$1', [
+        digest(v.exchange),
+      ]);
+      return user;
+    });
+    await issue(req, res, user);
+    res.json({ ok: true });
   });
 }

@@ -51,8 +51,8 @@ export function adminRoutes(app, { pool }) {
     ).rowCount;
     const service = (
       await pool.query(
-        'SELECT 1 FROM venue_app.services WHERE id=$1 AND studio_id=$2 AND active=true',
-        [v.serviceId, v.studioId],
+        'SELECT 1 FROM venue_app.services WHERE id=$1 AND studio_id=$2 AND active=true AND (artist_id IS NULL OR artist_id=$3)',
+        [v.serviceId, v.studioId, v.artistId],
       )
     ).rowCount;
     if (!artist || !service)
@@ -198,7 +198,7 @@ export function adminRoutes(app, { pool }) {
     res.json({
       artists: (
         await pool.query(
-          'SELECT a.user_id AS id,a.display_name,a.studio_id,a.published,a.books_open,u.name,u.email,u.role,u.active,st.name AS studio_name FROM venue_app.artist_profiles a JOIN venue_app.users u ON u.id=a.user_id LEFT JOIN venue_app.studios st ON st.id=a.studio_id ORDER BY a.display_name',
+          'SELECT a.user_id AS id,a.display_name,a.bio,a.styles,a.theme,a.slug,a.image_url,a.studio_id,a.published,a.books_open,u.name,u.email,u.role,u.active,st.name AS studio_name,st.published AS studio_published,(SELECT count(*)::int FROM venue_app.services s WHERE s.studio_id=a.studio_id AND s.active=true AND (s.artist_id IS NULL OR s.artist_id=a.user_id)) AS service_count,(SELECT count(*)::int FROM venue_app.availability h WHERE h.artist_id=a.user_id) AS availability_days FROM venue_app.artist_profiles a JOIN venue_app.users u ON u.id=a.user_id LEFT JOIN venue_app.studios st ON st.id=a.studio_id WHERE a.deleted_at IS NULL ORDER BY a.display_name',
         )
       ).rows,
     });
@@ -211,6 +211,10 @@ export function adminRoutes(app, { pool }) {
           displayName: z.string().trim().min(2).max(100),
           published: z.boolean(),
           booksOpen: z.boolean(),
+          bio: z.string().trim().max(2000).optional(),
+          styles: z.array(z.string().trim().min(1).max(50)).max(10).optional(),
+          theme: z.enum(['paper', 'ink', 'lavender']).optional(),
+          studioId: id.optional(),
         })
         .strict(),
       req.body,
@@ -220,14 +224,46 @@ export function adminRoutes(app, { pool }) {
         await db.query('SELECT role,active FROM venue_app.users WHERE id=$1 FOR UPDATE', [userId])
       ).rows[0];
       if (!user) throw new HttpError(404, 'Account not found.');
+      const profile = (
+        await db.query(
+          'SELECT * FROM venue_app.artist_profiles WHERE user_id=$1 AND deleted_at IS NULL FOR UPDATE',
+          [userId],
+        )
+      ).rows[0];
+      if (!profile) throw new HttpError(404, 'Artist profile not found.');
+      if (v.studioId && v.studioId !== profile.studio_id) {
+        if (!(await db.query('SELECT 1 FROM venue_app.studios WHERE id=$1', [v.studioId])).rowCount)
+          throw new HttpError(400, 'Choose an existing studio.');
+        if (
+          (await db.query('SELECT 1 FROM venue_app.bookings WHERE artist_id=$1 LIMIT 1', [userId]))
+            .rowCount
+        )
+          throw new HttpError(
+            409,
+            'This artist has booking history. Keep their studio assignment to preserve appointment records.',
+          );
+        await db.query('UPDATE venue_app.services SET studio_id=$1 WHERE artist_id=$2', [
+          v.studioId,
+          userId,
+        ]);
+      }
       if ((v.published || v.booksOpen) && (!user.active || user.role === 'client'))
         throw new HttpError(
           400,
           'Restricted or client accounts cannot be published or accept bookings.',
         );
       const updated = await db.query(
-        'UPDATE venue_app.artist_profiles SET display_name=$1,published=$2,books_open=$3 WHERE user_id=$4 RETURNING user_id',
-        [v.displayName, v.published, v.booksOpen, userId],
+        'UPDATE venue_app.artist_profiles SET display_name=$1,published=$2,books_open=$3,bio=$5,styles=$6,theme=$7,studio_id=$8 WHERE user_id=$4 RETURNING user_id',
+        [
+          v.displayName,
+          v.published,
+          v.booksOpen,
+          userId,
+          v.bio ?? profile.bio,
+          JSON.stringify(v.styles ?? profile.styles),
+          v.theme ?? profile.theme,
+          v.studioId ?? profile.studio_id,
+        ],
       );
       if (!updated.rowCount) throw new HttpError(404, 'Artist profile not found.');
       await audit(db, req.user, 'artist.updated', userId, {
@@ -276,6 +312,13 @@ export function adminRoutes(app, { pool }) {
         [v.role || user.role, v.active ?? user.active, userId, v.name || user.name],
       );
       const nextRole = v.role || user.role;
+      if (nextRole === 'artist' && v.active === true) {
+        const restored = await db.query(
+          'UPDATE venue_app.artist_profiles SET deleted_at=NULL,published=false,books_open=false WHERE user_id=$1 AND deleted_at IS NOT NULL RETURNING user_id',
+          [userId],
+        );
+        if (restored.rowCount) await audit(db, req.user, 'artist.restored', userId);
+      }
       if (
         nextRole === 'studio' ||
         (nextRole === 'artist' &&

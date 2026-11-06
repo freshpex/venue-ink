@@ -39,10 +39,7 @@ export async function finishSignIn(client: QueryClient, signal?: AbortSignal): P
   const user = await readSession(signal);
   if (!user) {
     client.setQueryData(['session'], null);
-    throw new ApiError(
-      'Your sign-in could not be verified. Allow cookies for this site, open it in your browser, and try again.',
-      401,
-    );
+    throw new ApiError('Your sign-in could not be completed. Please try again.', 401);
   }
   client.setQueryData(['session'], user);
   return user;

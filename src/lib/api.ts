@@ -1,4 +1,6 @@
-const configured = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
+import { configuredApiBase } from './runtime';
+import { saveSessionCredential, sessionHeaders } from './credentials';
+const configured = configuredApiBase.replace(/\/$/, '');
 export const apiBase = configured;
 export class ApiError extends Error {
   status: number;
@@ -7,40 +9,68 @@ export class ApiError extends Error {
     this.status = status;
   }
 }
+function requestSignal(timeoutMs: number, parent?: AbortSignal) {
+  const controller = new AbortController();
+  const cancel = () => controller.abort(parent?.reason);
+  const timer = setTimeout(
+    () => controller.abort(new DOMException('Request timed out', 'TimeoutError')),
+    timeoutMs,
+  );
+  if (parent?.aborted) cancel();
+  else parent?.addEventListener('abort', cancel, { once: true });
+  return {
+    signal: controller.signal,
+    dispose() {
+      clearTimeout(timer);
+      parent?.removeEventListener('abort', cancel);
+    },
+  };
+}
+
 export async function request<T>(
   path: string,
   options: RequestInit = {},
   signal?: AbortSignal,
+  timeoutMs = 20000,
 ): Promise<T> {
-  let response: Response;
+  const deadline = requestSignal(timeoutMs, signal);
   try {
-    response = await fetch(`${apiBase}/api${path}`, {
-      ...options,
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'VenueWorkspace',
-        ...options.headers,
-      },
-      signal: signal
-        ? AbortSignal.any([signal, AbortSignal.timeout(20000)])
-        : AbortSignal.timeout(20000),
+    let response: Response;
+    try {
+      response = await fetch(`${apiBase}/api${path}`, {
+        ...options,
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'VenueWorkspace',
+          ...sessionHeaders(apiBase),
+          ...options.headers,
+        },
+        signal: deadline.signal,
+      });
+    } catch (e) {
+      if (signal?.aborted) throw e;
+      throw new ApiError('The server could not be reached. Check the connection and try again.', 0);
+    }
+    if (!response.headers.get('content-type')?.includes('application/json'))
+      throw new ApiError(
+        'The server is starting. Please keep this page open or try again shortly.',
+        503,
+      );
+    const data = await response.json().catch(() => {
+      throw new ApiError('The server response could not be read. Please try again.', 503);
     });
-  } catch (e) {
-    if (signal?.aborted) throw e;
-    throw new ApiError('The server could not be reached. Check the connection and try again.', 0);
+    if (!response.ok) {
+      if (response.status === 401 && path !== '/auth/login') saveSessionCredential(null);
+      throw new ApiError(data.message || 'The request could not be completed.', response.status);
+    }
+    const credential = response.headers.get('X-Venue-Session');
+    if (credential) saveSessionCredential(credential);
+    if (path === '/auth/logout' || path === '/security/revoke-all') saveSessionCredential(null);
+    return data as T;
+  } finally {
+    deadline.dispose();
   }
-  if (!response.headers.get('content-type')?.includes('application/json'))
-    throw new ApiError(
-      'The server is starting. Please keep this page open or try again shortly.',
-      503,
-    );
-  const data = await response.json().catch(() => {
-    throw new ApiError('The server response could not be read. Please try again.', 503);
-  });
-  if (!response.ok)
-    throw new ApiError(data.message || 'The request could not be completed.', response.status);
-  return data as T;
 }
 export async function waitForServer(
   onState: (state: string) => void,
@@ -55,10 +85,8 @@ export async function waitForServer(
       const result = await request<{ ready: boolean }>(
         '/health',
         {},
-        AbortSignal.any([
-          signal,
-          AbortSignal.timeout(Math.max(1, Math.min(8000, deadline - Date.now()))),
-        ]),
+        signal,
+        Math.max(1, Math.min(8000, deadline - Date.now())),
       );
       if (result.ready) {
         onState('Signing you in…');
@@ -91,20 +119,42 @@ export async function waitForServer(
 }
 
 export async function download(path: string, filename: string) {
-  const response = await fetch(apiBase + '/api' + path, {
-    credentials: 'include',
-    signal: AbortSignal.timeout(30000),
-  });
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({ message: 'Download failed. Try again.' }));
-    throw new ApiError(data.message, response.status);
+  const deadline = requestSignal(30000);
+  try {
+    const response = await fetch(apiBase + '/api' + path, {
+      credentials: 'include',
+      headers: sessionHeaders(apiBase),
+      signal: deadline.signal,
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({ message: 'Download failed. Try again.' }));
+      throw new ApiError(data.message, response.status);
+    }
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } finally {
+    deadline.dispose();
   }
-  const url = URL.createObjectURL(await response.blob());
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export async function assetBlob(path: string, signal: AbortSignal): Promise<Blob> {
+  if (!/^\/api\/assets\/[a-f0-9-]+$/i.test(path)) throw new Error('Invalid image path.');
+  const deadline = requestSignal(30000, signal);
+  try {
+    const response = await fetch(apiBase + path, {
+      credentials: 'include',
+      headers: sessionHeaders(apiBase),
+      signal: deadline.signal,
+    });
+    if (!response.ok) throw new ApiError('The image could not be loaded.', response.status);
+    return await response.blob();
+  } finally {
+    deadline.dispose();
+  }
 }

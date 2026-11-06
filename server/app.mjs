@@ -19,6 +19,8 @@ import { securityRoutes } from './routes/security.mjs';
 import { checkSecondFactor, digest } from './security.mjs';
 import { enterpriseRoutes } from './routes/enterprise.mjs';
 import { adminRoutes } from './routes/admin.mjs';
+import { artistManagementRoutes } from './routes/artist-management.mjs';
+import { createProfileStorage } from './profile-storage.mjs';
 export function createApp({
   pool,
   secret,
@@ -33,15 +35,18 @@ export function createApp({
     .filter(Boolean),
   encryptionKey = process.env.DATA_ENCRYPTION_KEY || secret,
   siteUrl = process.env.SITE_URL || origins[0],
+  apiUrl = process.env.API_PUBLIC_URL || siteUrl,
   requireStaffMfa = process.env.REQUIRE_STAFF_MFA === 'true',
   logger = production ? (entry) => console.info(JSON.stringify(entry)) : () => {},
   isReady = () => true,
+  profileStorage = createProfileStorage(),
 }) {
   if (!secret || secret.length < 32)
     throw new Error('JWT_SECRET must contain at least 32 characters');
   const app = express();
   app.disable('x-powered-by');
   app.locals.encryptionKey = encryptionKey;
+  app.locals.profileStorage = profileStorage;
   app.locals.siteUrl = siteUrl.replace(/\/$/, '');
   app.locals.requireStaffMfa = requireStaffMfa;
   app.use((req, res, next) => {
@@ -93,7 +98,7 @@ export function createApp({
               formAction: ["'self'", 'https://*.tawk.to'],
               objectSrc: ["'none'"],
               frameAncestors: ["'none'"],
-              upgradeInsecureRequests: [],
+              upgradeInsecureRequests: production ? [] : null,
             },
           }
         : false,
@@ -103,6 +108,7 @@ export function createApp({
     cors({
       origin: (origin, callback) => callback(null, !origin || origins.includes(origin)),
       credentials: true,
+      exposedHeaders: ['X-Venue-Session'],
     }),
   );
   app.use(express.json({ limit: '9mb' }));
@@ -152,16 +158,15 @@ export function createApp({
         new Date(Date.now() + options.maxAge),
       ],
     );
-    res.cookie(
-      'venue_session',
-      jwt.sign({ sub: user.id, sv: user.session_version, jti: sessionId }, secret, {
-        expiresIn: '7d',
-        issuer: 'venue',
-        audience: 'venue-account',
-        algorithm: 'HS256',
-      }),
-      options,
-    );
+    const token = jwt.sign({ sub: user.id, sv: user.session_version, jti: sessionId }, secret, {
+      expiresIn: '7d',
+      issuer: 'venue',
+      audience: 'venue-account',
+      algorithm: 'HS256',
+    });
+    res.cookie('venue_session', token, options);
+    if (req.get('X-Venue-Session') === 'browser' && origins.includes(req.get('Origin') || ''))
+      res.set('X-Venue-Session', token);
   };
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -173,13 +178,17 @@ export function createApp({
   const writeLimiter = rateLimit({
     windowMs: 60000,
     limit: 90,
+    skip: (req) => ['GET', 'HEAD', 'OPTIONS'].includes(req.method),
     standardHeaders: 'draft-8',
     legacyHeaders: false,
     message: { message: 'Please wait a moment before making more changes.' },
   });
   const fallbackHash = bcrypt.hashSync(randomBytes(32).toString('hex'), 12);
   const optionalAuth = async (req, _res, next) => {
-    const token = req.cookies.venue_session;
+    const authorization = req.get('Authorization');
+    const token = authorization
+      ? /^Bearer ([A-Za-z0-9._-]+)$/.exec(authorization)?.[1]
+      : req.cookies.venue_session;
     if (!token) return next();
     try {
       const claims = jwt.verify(token, secret, {
@@ -328,13 +337,14 @@ export function createApp({
       issuer: process.env.OIDC_ISSUER,
       clientId: process.env.OIDC_CLIENT_ID,
       clientSecret: process.env.OIDC_CLIENT_SECRET,
-      redirectUri: app.locals.siteUrl + '/api/auth/sso/callback',
+      redirectUri: apiUrl.replace(/\/$/, '') + '/api/auth/sso/callback',
     });
   app.locals.ssoEnabled = !!ssoProvider;
   ssoRoutes(app, {
     pool,
     key: encryptionKey,
     siteUrl: app.locals.siteUrl,
+    apiUrl: apiUrl.replace(/\/$/, ''),
     issue,
     limiter,
     production,
@@ -410,6 +420,7 @@ export function createApp({
   bookingRoutes(app, { pool });
   workspaceRoutes(app, { pool });
   adminRoutes(app, { pool });
+  artistManagementRoutes(app, { pool });
   app.use('/api', (_req, res) =>
     res.status(404).json({ message: 'This route could not be found.' }),
   );
@@ -440,6 +451,7 @@ export function cleanUser(user) {
     email: user.email,
     role: user.role,
     created_at: user.created_at,
+    image_url: user.image_url || null,
     mfaEnabled: user.mfa_enabled ?? !!user.mfa_secret,
   };
 }

@@ -5,8 +5,10 @@ export type User = {
   email: string;
   role: 'admin' | 'studio' | 'artist' | 'client';
   created_at: string;
+  image_url?: string | null;
 };
 export type Artist = {
+  studio_image_url?: string | null;
   id: string;
   slug: string;
   display_name: string;
@@ -21,6 +23,7 @@ export type Artist = {
   published?: boolean;
 };
 export type Studio = {
+  image_url?: string | null;
   id: string;
   name: string;
   slug: string;
@@ -30,6 +33,8 @@ export type Studio = {
   published?: boolean;
 };
 export type Service = {
+  artist_id?: string | null;
+  artist_name?: string;
   id: string;
   studio_id: string;
   name: string;

@@ -375,8 +375,8 @@ export function Legal() {
             <p>
               Your account name, email, protected password, booking details, reference images,
               messages, payment enquiries and support requests are stored to provide the service.
-              Account cookies keep you signed in. This site uses local fonts and does not add
-              advertising trackers.
+              Account cookies or tab-scoped browser storage keep you signed in. This site uses local
+              fonts and does not add advertising trackers.
             </p>
             <h2>Access and requests</h2>
             <p>
@@ -385,12 +385,18 @@ export function Legal() {
               Contact support to request access, correction or deletion; records needed for a
               dispute or payment may need to be retained.
             </p>
-            <h2>Email enquiries</h2>
+            <h2>Your cookie choices</h2>
             <p>
-              The optional live support widget is provided by Tawk.to. It may process your IP
-              address, browser information, page visits and messages, and use cookies to maintain a
-              support conversation. Share only the details needed for your enquiry. You can also
-              contact Venue through the platform’s support form.
+              Essential cookies and browser storage support sign-in, security, bookings and live
+              support. Live chat is enabled by default as an essential service. Cookie settings in
+              the footer describe these services.
+            </p>
+            <h2>Support and enquiries</h2>
+            <p>
+              The live support widget is provided by Tawk.to and loads automatically. It may process
+              your IP address, browser information, page visits and messages, and use cookies to
+              maintain a support conversation. Share only the details needed for your enquiry. You
+              can also contact Venue through the platform’s support form.
             </p>
             <p>
               When you contact us, your chosen communication service may process your message. Share
