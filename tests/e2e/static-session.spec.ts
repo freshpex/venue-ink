@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { fixture } from '../helpers/platform.mjs';
+import { forwardWithoutCookies } from '../helpers/cookieless-route';
 let f: Awaited<ReturnType<typeof fixture>>;
 test.beforeAll(async () => {
   f = await fixture();
@@ -14,9 +15,13 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   await f?.cleanup();
 });
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'wait' });
+});
 test('stays on the static site and authenticates, reloads, and opens private images without any API cookie', async ({
   page,
   context,
+  request,
 }) => {
   await page.addInitScript(() => {
     try {
@@ -36,11 +41,7 @@ test('stays on the static site and authenticates, reloads, and opens private ima
     }),
   );
   await page.route('http://localhost:4173/api/**', async (route) => {
-    const response = await route.fetch();
-    const headers = response.headers();
-    delete headers['set-cookie'];
-    await context.clearCookies();
-    await route.fulfill({ response, headers });
+    await forwardWithoutCookies(route, request);
   });
   await page.goto('/login');
   await page.getByLabel('Email address', { exact: true }).fill(f.client.email);
@@ -53,6 +54,9 @@ test('stays on the static site and authenticates, reloads, and opens private ima
   expect(await page.evaluate(() => !!sessionStorage.getItem('venue-browser-session'))).toBe(true);
   await page.reload();
   await expect(page.locator('.workspace-shell')).toBeVisible();
+  expect(
+    (await context.cookies()).filter((cookie) => cookie.name === 'venue_session'),
+  ).toHaveLength(0);
   await page.goto('/dashboard?tab=profile');
   const image = page.getByRole('img', { name: 'Private reference.webp', exact: true });
   await expect(image).toBeVisible();
